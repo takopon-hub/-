@@ -1,0 +1,9 @@
+{
+  "name": "tagiron",
+  "version": "1.0.0",
+  "private": true,
+  "description": "タギロン: 論理推理の対戦ゲーム",
+  "scripts": {
+    "test": "node test/test.js"
+  }
+}
