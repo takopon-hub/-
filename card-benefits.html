@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>カード特典サーチ</title>
+<style>
+:root{
+  --bg:#f5f6f8; --card:#fff; --text:#1c2230; --sub:#667085; --line:#e3e6ec;
+  --accent:#2563eb; --best:#16a34a; --best-bg:#ecfdf3; --warn:#b45309; --warn-bg:#fef3c7; --chip:#eef1f6; --today:#dc2626;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0f1218; --card:#181c25; --text:#e8ebf2; --sub:#9aa3b5; --line:#2a3040;
+    --accent:#6b9bff; --best:#4ade80; --best-bg:#12281b; --warn:#fbbf24; --warn-bg:#33270a; --chip:#232938; --today:#f87171; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:8px 0 4px}
+.sub{font-size:12px;color:var(--sub);margin:0 0 8px}
+.search{position:sticky;top:0;background:var(--bg);padding:8px 0 10px;z-index:5}
+input[type=search],input[type=text],input[type=number],select{
+  width:100%;padding:13px 14px;font-size:16px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--text)}
+input:focus,select:focus{outline:2px solid var(--accent);border-color:transparent}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.chip{border:0;background:var(--chip);color:var(--text);padding:9px 14px;border-radius:999px;font-size:14px;cursor:pointer}
+.chip:hover{background:var(--line)}
+h3.sec{font-size:13px;color:var(--sub);margin:14px 0 2px;font-weight:600}
+.store{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+.store h2{font-size:17px;margin:0 0 2px}
+.cat{font-size:12px;color:var(--sub)}
+.offer{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.rate{min-width:72px;text-align:center;font-weight:700;font-size:20px;line-height:1.2;padding:6px 0;border-radius:10px;background:var(--chip)}
+.rate small{display:block;font-size:10px;font-weight:500;color:var(--sub)}
+.offer.best .rate{background:var(--best-bg);color:var(--best)}
+.offer.today .rate{outline:2px solid var(--today)}
+.cname{font-weight:600}
+.badge{font-size:11px;padding:1px 7px;border-radius:6px;margin-left:6px;font-weight:600;vertical-align:1px;white-space:nowrap}
+.b-best{background:var(--best);color:#fff}
+.b-chk{background:var(--warn-bg);color:var(--warn)}
+.b-my{background:var(--accent);color:#fff}
+.b-today{background:var(--today);color:#fff}
+.label{font-size:14px}
+.two{font-size:13px;color:var(--text)}
+.note{font-size:12px;color:var(--sub)}
+.pay{display:inline-block;font-size:12px;background:var(--chip);border-radius:6px;padding:1px 8px;margin-top:2px}
+details{margin-top:8px}
+summary{cursor:pointer;color:var(--accent);font-size:13px;padding:4px 0}
+.base-list{font-size:13px;color:var(--sub);padding:6px 0 0 0;margin:0;list-style:none}
+.base-list li{display:flex;justify-content:space-between;gap:8px;border-top:1px dashed var(--line);padding:3px 0}
+.empty{color:var(--sub);text-align:center;padding:24px 0}
+.tabs{display:flex;gap:6px;margin:6px 0}
+.tab{flex:1;padding:11px 4px;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:10px;cursor:pointer;font-size:14px}
+.tab[aria-selected=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+.box h3{margin:0;font-size:15px}
+.box p{margin:4px 0 0;font-size:13px;color:var(--sub)}
+.box a{color:var(--accent);font-size:12px}
+.form{display:grid;gap:8px;margin-top:8px}
+.form .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button.primary{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:13px;font-size:15px;cursor:pointer}
+.my-item{display:flex;justify-content:space-between;gap:8px;font-size:13px;border-top:1px solid var(--line);padding:8px 0}
+.my-item button{border:0;background:none;color:#dc2626;cursor:pointer;font-size:14px}
+.foot{font-size:12px;color:var(--sub);margin:24px 0}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>💳 カード特典サーチ</h1>
+  <p class="sub" id="today"></p>
+
+  <div class="search">
+    <input id="q" type="search" placeholder="店舗名・カテゴリ（例: セブン、マック、イオン、ENEOS）" autocomplete="off">
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-tab="search">店舗検索</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="cards">カード/支払方法</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="mine">特典を追加</button>
+  </div>
+
+  <section id="p-search">
+    <div id="todayBox"></div>
+    <div id="histWrap" hidden><h3 class="sec">最近の検索</h3><div class="chips" id="hist"></div></div>
+    <h3 class="sec" id="chipsTitle">カテゴリ・店舗</h3>
+    <div class="chips" id="chips"></div>
+    <div id="results"></div>
+  </section>
+
+  <section id="p-cards" hidden></section>
+
+  <section id="p-mine" hidden>
+    <p class="note">自分で調べた特典を登録できます（このブラウザ内に保存）。検索結果に「マイ登録」として反映されます。</p>
+    <form class="form" id="form">
+      <input id="f-store" type="text" placeholder="店舗名（例: ユニクロ）" required>
+      <div class="row">
+        <select id="f-card"></select>
+        <select id="f-type">
+          <option value="pt">ポイント還元</option>
+          <option value="off">割引（%OFF）</option>
+          <option value="perk">その他の特典</option>
+        </select>
+      </div>
+      <div class="row">
+        <input id="f-base" type="number" step="0.1" min="0" placeholder="通常 %（任意）">
+        <input id="f-max" type="number" step="0.1" min="0" placeholder="最大 %（任意）">
+      </div>
+      <input id="f-label" type="text" placeholder="特典内容" required>
+      <input id="f-note" type="text" placeholder="条件・メモ（任意）">
+      <button class="primary" type="submit">登録</button>
+    </form>
+    <h3 class="sec">登録済み</h3>
+    <div id="my-list"></div>
+  </section>
+
+  <p class="foot">
+    ⚠ 2026年10月にWeb検索（公式サイト・解説記事）で調べた内容を反映した目安です。キャンペーン・還元率・対象店舗・条件
+    （タッチ決済、エントリー、上限、会員ランク等）は頻繁に変わります。<span class="badge b-chk">要確認</span> が付く項目は、
+    情報源が解説記事のみ、または条件が複雑なものです。必ず公式サイト/アプリでご確認ください。
+  </p>
+</div>
+
+<script>
+/* ===== カード定義 ===== base: 通常の基本還元率(%) / null=店舗限定 ===== */
+const CARDS = {
+  sga:{name:"セゾンアメックスゴールド", base:0.5, baseNote:"永久不滅ポイント", desc:"国内主要空港ラウンジ無料、最高5,000万円の旅行傷害保険、プライオリティ・パス(別途申込)。※西友・リヴィン・サニーの毎月5・20日5%OFF(セゾンカード感謝デー)は2022年3月に終了。", src:"https://www.saisoncard.co.jp/amextop/gold-first0-new/"},
+  sa: {name:"セゾンアメックス", base:0.5, baseNote:"永久不滅ポイント", desc:"基本は永久不滅ポイント0.5%。店舗限定の大きな特典は現在確認できず。"},
+  epg:{name:"エポスカードゴールド", base:0.5, baseNote:"エポスポイント", desc:"マルイ「マルコとマルオの7日間」10%OFF、選べるポイントアップショップ(最大3店舗、2025年4月改定で2倍＝約1.0%)、カラオケ優待(ビッグエコー/カラオケ館)。"},
+  rk: {name:"楽天カード", base:1.0, baseNote:"楽天ポイント", desc:"基本1%。楽天市場でSPU加算(3%〜)、5と0のつく日にエントリーでポイントアップ。楽天ペイの還元率は2026年に見直しの報道があり要確認。"},
+  rd: {name:"りそなデビットカード", base:0.2, baseNote:"キャッシュバック（要確認）", desc:"プレミアム(月会費700円)なら最大2%還元(月間ポイント上限あり)。通常版の還元率は要確認。", src:"https://www.resonabank.co.jp/kojin/visa_debit/premium/cam/2026_shinki/"},
+  smbc:{name:"三井住友カード(NL/一般)", base:0.5, baseNote:"Vポイント", desc:"対象のコンビニ・飲食店でスマホのVisa/Mastercardタッチ決済・モバイルオーダーなら最大7〜8%還元。物理カードのタッチ決済・iD・差込は対象外または低率。", src:"https://www.smbc-card.com/mem/cardinfo/26/cardinfo4030033.jsp"},
+  olv:{name:"Olive", base:0.5, baseNote:"Vポイント(クレジットモード)", desc:"クレジットモードで対象店舗のスマホタッチ決済なら最大8%(2026年2月〜)。デビットモードは最大1.5%。Vポイントアッププログラムで追加。", src:"https://www.smbc.co.jp/kojin/olive/special/offers/credit4.html"},
+  mzj:{name:"みずほJCBデビット", base:0.25, baseNote:"ポイント（要確認）", desc:"JCB優待店(Amazon等)でポイントアップの可能性。デビットでの倍率は公式未確認。"},
+  pp: {name:"PayPay", base:0.5, baseNote:"PayPayポイント（PayPayカード払いは1%〜）", desc:"PayPayカード払いで基本1%(ステップ達成で最大1.5%)。Yahoo!ショッピングは最大5%相当、5のつく日は最大4%(PayPay支払い)。"},
+  msp:{name:"三井ショッピングパーク", base:2.0, baseNote:"クレジット払い 100円(税抜)で2pt", desc:"ららぽーと・三井アウトレットパーク等で、カード提示で1%、クレジット払いで通常2%。ポイントアップデー等で最大5%。", src:"https://matsunosuke.jp/mitsui-shopping-park-card-saison"},
+  nic:{name:"三菱UFJニコス(MUFGカード)", base:0.5, baseNote:"グローバルポイント", desc:"対象のコンビニ・スーパー・飲食店で5.5〜7%相当(セブン、松屋、くら寿司、スシロー、オーケー等は7%)。1pt=5円交換などの条件あり。", src:"https://www.bk.mufg.jp/tsukau/credit/lp/mucard_point_202502/"},
+  rp: {name:"楽天ポイント", base:null, baseNote:"加盟店でカード提示", desc:"加盟店で楽天ポイントカード提示＋楽天カード払いの二重取り(最大1.5%)。ENEOS/出光は給油2Lごと1pt。"},
+  ia: {name:"iAEON", base:null, baseNote:"イオン系列限定", desc:"毎月20・30日お客さま感謝デー5%OFF（イオンカード/AEON Pay等で支払い）、10日ありが10デー(WAON POINT)、15日G.G感謝デー(55歳以上)。", src:"https://www.aeonbank.co.jp/aeoncard/incentive/discount/"},
+  mp: {name:"メルペイカード", base:1.0, baseNote:"メルカリポイント", desc:"メルカード通常1%。メルカリでの購入は1〜4%(変動・上限5,000P)、毎月8日はエントリーで+8%(上限300P)。", src:"https://help.jp.mercari.com/guide/articles/1227"},
+  au: {name:"au PAY カード", base:1.0, baseNote:"Pontaポイント", desc:"基本1%。au PAY(コード決済)併用で約1.5%。ローソンはau PAY払いで最大1.5%。"}
+};
+
+/* ===== 支払方法の組合せ ===== */
+const COMBOS = [
+  {name:"スマホのタッチ決済(Apple Pay/Google Pay) × 三井住友カード/Olive", rate:"最大7〜8%", note:"対象のコンビニ・飲食店のみ。物理カードのタッチ決済やiDは対象外/低率。"},
+  {name:"楽天ポイントカード提示 × 楽天カード払い", rate:"最大1.5%", note:"提示0.5%＋カード1%。ファミリーマート等の加盟店。"},
+  {name:"楽天ペイ × 楽天カード", rate:"約1.0〜1.5%", note:"2026年に還元率改定の報道あり。公式で要確認。"},
+  {name:"PayPay × PayPayカード(あと払い)", rate:"1.0〜1.5%", note:"PayPayステップ達成(30回以上/10万円以上＋eKYC)で1.5%。"},
+  {name:"au PAY × au PAY カード", rate:"約1.5%", note:"カード1%＋au PAY分。ローソンは最大1.5%。"},
+  {name:"メルペイ × メルカード", rate:"1.0%", note:"メルカリでの購入は1〜4%、毎月8日は+8%(エントリー)。"},
+  {name:"AEON Pay/イオンカード × iAEON", rate:"20・30日5%OFF", note:"支払方法によって対象外あり。"},
+  {name:"三菱UFJカード × 対象店舗", rate:"5.5〜7%", note:"グローバルポイント。交換条件・エントリー要確認。"}
+];
+
+/* ===== 特典データ ===== */
+/* o(card, base通常%, max最大%, 特典内容, 条件, {type, days, pay, check})
+   days: {dom:[日付], dow:[曜日0=日], label} / type: pt=ポイント / off=割引 / perk=その他 */
+const o=(card,base,max,label,cond="",opt={})=>({card,base,max,label,cond,type:"pt",...opt});
+const SMBC=o("smbc",0.5,8,"スマホのタッチ決済/モバイルオーダーで最大8%還元","物理カードのタッチ決済・iD・差込は対象外。7%表記の時期あり。対象店舗・ポイント加算外店舗あり",{pay:"Apple Pay / Google Pay (Visa・Mastercardタッチ)",check:true});
+const OLV=o("olv",0.5,8,"クレジットモード＋スマホタッチ決済で最大8%還元","デビットモードは最大1.5%。Vポイントアッププログラムで更に加算",{pay:"Oliveフレキシブルペイ(クレジットモード)",check:true});
+
+const OFFERS = [
+ /* --- コンビニ --- */
+ {name:"セブン-イレブン", alias:["セブン","7-11","seven","711","セブンイレブン"], cat:"コンビニ", offers:[
+   SMBC, OLV,
+   o("nic",0.5,7,"対象店舗で7%相当（グローバルポイント）","1pt=5円交換等の条件・エントリー要確認",{check:true})]},
+ {name:"ローソン", alias:["lawson","ナチュラルローソン","ローソンストア100"], cat:"コンビニ", offers:[
+   SMBC, OLV,
+   o("nic",0.5,5.5,"対象店舗で5.5%相当","条件・エントリー要確認",{check:true}),
+   o("au",1.0,1.5,"au PAY払いで最大1.5%","Ponta会員ID連携が必要。時間帯等で変動",{pay:"au PAY × au PAY カード",check:true})]},
+ {name:"ファミリーマート", alias:["ファミマ","familymart"], cat:"コンビニ", offers:[
+   SMBC, OLV,
+   o("rp",1.0,1.5,"楽天ポイントカード提示＋楽天カード払いの二重取り","提示0.5%＋カード1%",{pay:"楽天ポイントカード提示 × 楽天カード",check:true})]},
+ {name:"ミニストップ", alias:["ministop"], cat:"コンビニ", offers:[SMBC, OLV]},
+ /* --- 外食 --- */
+ {name:"マクドナルド", alias:["マック","mcdonald","マクド"], cat:"ファストフード", offers:[SMBC, OLV]},
+ {name:"モスバーガー", alias:["モス","mos","フレッシュネスバーガー","フレッシュネス"], cat:"ファストフード", offers:[SMBC, OLV]},
+ {name:"すき家", alias:["すきや","sukiya"], cat:"牛丼", offers:[SMBC, OLV]},
+ {name:"松屋", alias:["まつや","matsuya"], cat:"牛丼", offers:[
+   o("nic",0.5,7,"対象店舗で7%相当","条件・エントリー要確認",{check:true})]},
+ {name:"サイゼリヤ", alias:["サイゼ"], cat:"ファミレス", offers:[SMBC, OLV]},
+ {name:"ガスト", alias:["gusto","すかいらーく","バーミヤン","ジョナサン","しゃぶ葉","夢庵"], cat:"ファミレス", offers:[SMBC, OLV]},
+ {name:"ココス", alias:["cocos"], cat:"ファミレス", offers:[SMBC, OLV]},
+ {name:"ドトールコーヒー", alias:["ドトール","doutor","エクセルシオール"], cat:"カフェ", offers:[SMBC, OLV]},
+ {name:"スターバックス", alias:["スタバ","starbucks"], cat:"カフェ", offers:[SMBC, OLV]},
+ {name:"回転寿司(くら寿司・スシロー)", alias:["くら寿司","スシロー","寿司"], cat:"外食", offers:[
+   o("nic",0.5,7,"対象店舗で7%相当","条件・エントリー要確認",{check:true})]},
+ {name:"ビッグエコー", alias:["カラオケ","bigecho","big echo"], cat:"カラオケ", offers:[
+   o("epg",null,30,"室料30%OFF または 飲み放題プラン10%OFF","カード提示。クーポンとの併用不可",{type:"off",check:true})]},
+ {name:"カラオケ館", alias:["カラオケ"], cat:"カラオケ", offers:[
+   o("epg",null,30,"室料30%OFF","カード提示。クーポンとの併用不可",{type:"off",check:true})]},
+ /* --- ネット通販 --- */
+ {name:"楽天市場", alias:["楽天","rakuten","楽天ブックス"], cat:"ネット通販", offers:[
+   o("rk",1.0,5,"5と0のつく日はエントリーでポイントアップ（通常3%〜 SPU）","上限・エントリー条件あり",{days:{dom:[5,10,15,20,25,30],label:"5・0のつく日"},pay:"楽天カード",check:true})]},
+ {name:"Amazon", alias:["アマゾン","amazon"], cat:"ネット通販", offers:[
+   o("rk",1.0,1.0,"基本還元1%","",{}),
+   o("mzj",0.25,1.5,"JCB優待店でポイントアップの可能性","デビットでの適用は未確認",{check:true})]},
+ {name:"Yahoo!ショッピング", alias:["ヤフー","yahoo","ペイペイモール","paypayモール"], cat:"ネット通販", offers:[
+   o("pp",1.0,5,"最大5%相当（ストアポイント＋PayPayカード等）","LINE連携・LYPプレミアム等の条件で変動",{pay:"PayPay × PayPayカード",check:true}),
+   o("pp",1.0,4,"5のつく日(5・15・25日) 最大4%","PayPay支払い・エントリー・月間上限あり",{days:{dom:[5,15,25],label:"5のつく日"},check:true})]},
+ {name:"メルカリ", alias:["mercari"], cat:"ネット通販", offers:[
+   o("mp",1.0,4,"メルカード払いで1〜4%（変動）","上限5,000P。通常は1%",{check:true}),
+   o("mp",1.0,9,"毎月8日 エントリーで+8%","メルカリ購入のみ・上限300P",{days:{dom:[8],label:"毎月8日"},check:true})]},
+ {name:"au PAY マーケット", alias:["aupayマーケット","ポンパレモール"], cat:"ネット通販", offers:[
+   o("au",1.0,3,"au PAY カード払いでPonta高還元","キャンペーン・条件で変動",{check:true})]},
+ /* --- スーパー・商業施設 --- */
+ {name:"イオン", alias:["aeon","イオンモール","イオンスタイル","マックスバリュ","ザ・ビッグ","ダイエー","まいばすけっと"], cat:"スーパー", offers:[
+   o("ia",null,5,"お客さま感謝デー 5%OFF","お酒・たばこ等は対象外。支払方法・店舗により対象外あり",{type:"off",days:{dom:[20,30],label:"毎月20・30日"},pay:"イオンカード / AEON Pay / WAON",check:true}),
+   o("ia",null,null,"ありが10デー（WAON POINT優遇）","AEON Pay等でWAON POINT還元",{type:"perk",days:{dom:[10],label:"毎月10日"},check:true}),
+   o("ia",null,5,"G.G感謝デー 5%OFF（55歳以上）","",{type:"off",days:{dom:[15],label:"毎月15日"},check:true})]},
+ {name:"オーケー", alias:["ok","オーケーストア","オオゼキ"], cat:"スーパー", offers:[
+   o("nic",0.5,7,"対象店舗で7%相当","条件・エントリー要確認",{check:true})]},
+ {name:"ららぽーと", alias:["lalaport","ラゾーナ","ダイバーシティ","三井ショッピングパーク","コレド","ららテラス"], cat:"商業施設", offers:[
+   o("msp",1.0,2,"クレジット払い100円(税抜)で2pt（提示のみは1%）","ポイントアップデーで最大5%。店舗により対象外あり",{check:true})]},
+ {name:"三井アウトレットパーク", alias:["mop","アウトレット"], cat:"商業施設", offers:[
+   o("msp",1.0,2,"クレジット払い100円(税抜)で2pt（提示のみは1%）","ポイントアップデーで最大5%",{check:true})]},
+ {name:"マルイ", alias:["丸井","marui","モディ","modi"], cat:"百貨店", offers:[
+   o("epg",null,10,"マルコとマルオの7日間 10%OFF","年数回の開催期間のみ。実施日は公式で確認",{type:"off",check:true})]},
+ /* --- ドラッグストア --- */
+ {name:"マツモトキヨシ", alias:["マツキヨ","ココカラファイン"], cat:"ドラッグストア", offers:[
+   o("rp",1.0,1.5,"楽天ポイントカード提示＋楽天カード払い","楽天ポイント加盟か店舗で要確認",{pay:"楽天ポイントカード提示 × 楽天カード",check:true})]},
+ /* --- ガソリン・交通・旅行 --- */
+ {name:"ENEOS", alias:["エネオス","ガソリン","ガソリンスタンド","給油","出光","idemitsu","apollostation"], cat:"ガソリン", offers:[
+   o("rp",1.0,1.0,"給油2Lごとに楽天ポイント1pt＋楽天カード払い1%","出光は楽天カード払いのみポイント対象。一部店舗は燃料外でポイント不可",{pay:"楽天ポイントカード提示 × 楽天カード",check:true})]},
+ {name:"モバイルSuica / 交通", alias:["suica","スイカ","jr","電車","交通","icカード"], cat:"交通", offers:[
+   o("rk",1.0,1.0,"チャージ時に基本還元1%の可能性","チャージ対応・ポイント付与は要確認",{check:true})]},
+ {name:"楽天トラベル", alias:["旅行","ホテル","宿泊","トラベル"], cat:"旅行", offers:[
+   o("rk",1.0,3,"SPU加算で3%前後","キャンペーン・条件で変動",{check:true})]},
+ {name:"空港ラウンジ", alias:["空港","ラウンジ","海外旅行","旅行保険","プライオリティパス"], cat:"旅行", offers:[
+   o("sga",null,null,"国内主要空港ラウンジ無料＋旅行傷害保険(最高5,000万円)＋プライオリティ・パス(別途申込)","カード提示。同伴者は有料",{type:"perk"}),
+   o("epg",null,null,"国内主要空港ラウンジ無料 / 海外旅行保険","自動付帯の条件は要確認",{type:"perk",check:true})]},
+ /* --- コード決済 --- */
+ {name:"コード決済対応店", alias:["paypay","ペイペイ","メルペイ","aupay","コード決済","qr","楽天ペイ"], cat:"コード決済", offers:[
+   o("pp",0.5,1.5,"PayPayカード払い1%〜（ステップ達成で1.5%）","PayPayクレジット設定・利用条件あり",{pay:"PayPay × PayPayカード",check:true}),
+   o("au",1.0,1.5,"au PAY × au PAY カード","",{pay:"au PAY × au PAY カード",check:true}),
+   o("mp",1.0,1.0,"メルペイ × メルカード","",{pay:"メルペイ × メルカード",check:true}),
+   o("rk",1.0,1.5,"楽天ペイ × 楽天カード","2026年に還元率改定の報道あり",{pay:"楽天ペイ × 楽天カード",check:true})]}
+];
+
+/* ===== ユーティリティ ===== */
+const LS_KEY="card-benefit-custom-v2", HIST_KEY="card-benefit-hist-v1";
+const store={
+  get(k){try{return JSON.parse(localStorage.getItem(k))||[]}catch(e){return []}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+};
+const norm=s=>(s||"").toLowerCase()
+  .replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60))
+  .replace(/[\s\-ー・!！_]/g,"");
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=n=>Number.isInteger(n)?n:n.toFixed(1);
+const $=id=>document.getElementById(id);
+const NOW=new Date(), DOW="日月火水木金土";
+const matchToday=d=>d?((d.dom&&d.dom.includes(NOW.getDate()))||(d.dow&&d.dow.includes(NOW.getDay()))):null;
+
+/* 実効率: 日付限定特典は該当日以外は通常値で評価 */
+const effRate=x=>{
+  const dated=x.days&&!matchToday(x.days);
+  const v=dated?x.base:(x.max??x.base);
+  return v==null?-1:v;
+};
+
+function buildStores(){
+  const stores=OFFERS.map(s=>({...s,offers:s.offers.map(x=>({...x}))}));
+  store.get(LS_KEY).forEach((m,i)=>{
+    const key=norm(m.store);
+    let st=stores.find(s=>norm(s.name)===key||s.alias.some(a=>norm(a)===key));
+    if(!st){st={name:m.store,alias:[],cat:"マイ登録",offers:[]};stores.push(st)}
+    st.offers.push({card:m.card,base:m.base,max:m.max,label:m.label,cond:m.note,type:m.type,my:true});
+  });
+  return stores;
+}
+
+/* ===== 描画 ===== */
+function rateBox(x){
+  const unit=x.type==="off"?"OFF":"還元";
+  const top=x.max??x.base;
+  if(top==null) return `<div class="rate">🎁<small>特典</small></div>`;
+  return `<div class="rate">${fmt(top)}%<small>${x.max!=null&&x.base!=null&&x.max!==x.base?"最大":unit}</small></div>`;
+}
+function renderOffer(x,best){
+  const c=CARDS[x.card]||{name:x.card};
+  const isToday=x.days&&matchToday(x.days);
+  const two=(x.base!=null&&x.max!=null&&x.base!==x.max)
+    ?`<div class="two">通常 ${fmt(x.base)}% ／ 最大 ${fmt(x.max)}%</div>`:"";
+  return `<div class="offer ${best?"best":""} ${isToday?"today":""}">
+    ${rateBox(x)}
+    <div>
+      <div class="cname">${esc(c.name)}
+        ${best?'<span class="badge b-best">最高</span>':""}
+        ${isToday?'<span class="badge b-today">今日使える</span>':""}
+        ${x.days&&!isToday?`<span class="badge b-chk">${esc(x.days.label)}</span>`:""}
+        ${x.check?'<span class="badge b-chk">要確認</span>':""}
+        ${x.my?'<span class="badge b-my">マイ登録</span>':""}</div>
+      <div class="label">${esc(x.label)}</div>
+      ${two}
+      ${x.pay?`<div><span class="pay">支払: ${esc(x.pay)}</span></div>`:""}
+      ${x.cond?`<div class="note">${esc(x.cond)}</div>`:""}
+    </div></div>`;
+}
+function renderStore(s){
+  const sorted=[...s.offers].sort((a,b)=>effRate(b)-effRate(a));
+  const top=effRate(sorted[0]);
+  const used=new Set(s.offers.map(x=>x.card));
+  const others=Object.entries(CARDS).filter(([id,c])=>!used.has(id)&&c.base!=null)
+    .sort((a,b)=>b[1].base-a[1].base);
+  const body=sorted.map(x=>renderOffer(x,top>0&&effRate(x)===top)).join("");
+  const baseHtml=others.length?`<details><summary>特典なし：基本還元のみのカード（${others.length}枚）</summary>
+    <ul class="base-list">${others.map(([id,c])=>`<li><span>${esc(c.name)}</span><span>${fmt(c.base)}%（${esc(c.baseNote)}）</span></li>`).join("")}</ul></details>`:"";
+  return `<article class="store"><h2>${esc(s.name)}</h2><div class="cat">${esc(s.cat)}</div>${body}${baseHtml}</article>`;
+}
+function render(){
+  const q=$("q").value.trim(), box=$("results");
+  const showHome=!q;
+  $("todayBox").hidden=$("chips").hidden=$("chipsTitle").hidden=!showHome;
+  $("histWrap").hidden=!showHome||!store.get(HIST_KEY).length;
+  if(showHome){box.innerHTML="";return}
+  const k=norm(q);
+  const hits=buildStores().filter(s=>[s.name,s.cat,...s.alias].some(t=>norm(t).includes(k)));
+  if(!hits.length){
+    const base=Object.values(CARDS).filter(c=>c.base!=null).sort((a,b)=>b.base-a.base);
+    box.innerHTML=`<div class="empty">「${esc(q)}」の特典は登録されていません。</div>
+      <article class="store"><h2>基本還元率ランキング</h2><div class="cat">店舗特典がない場合の目安</div>
+      <ul class="base-list">${base.map(c=>`<li><span>${esc(c.name)}</span><span>${fmt(c.base)}%（${esc(c.baseNote)}）</span></li>`).join("")}</ul>
+      <p class="note">「特典を追加」タブから登録できます。</p></article>`;
+    return;
+  }
+  box.innerHTML=hits.map(renderStore).join("");
+}
+function renderToday(){
+  const items=[];
+  buildStores().forEach(s=>s.offers.forEach(x=>{if(x.days&&matchToday(x.days)) items.push({s,x})}));
+  $("today").textContent=`今日は ${NOW.getMonth()+1}/${NOW.getDate()}（${DOW[NOW.getDay()]}）`;
+  $("todayBox").innerHTML=items.length
+    ?`<div class="store"><h2>📅 今日使える日付限定特典</h2>${items.map(({s,x})=>
+       `<div class="offer today">${rateBox(x)}<div><div class="cname">${esc(s.name)} × ${esc(CARDS[x.card]?.name||x.card)}</div>
+        <div class="label">${esc(x.label)}</div>${x.cond?`<div class="note">${esc(x.cond)}</div>`:""}</div></div>`).join("")}</div>`
+    :`<div class="note">今日が対象の日付限定特典はありません。</div>`;
+}
+function renderChips(){
+  const stores=buildStores();
+  const cats=[...new Set(stores.map(s=>s.cat))];
+  $("chips").innerHTML=[...cats,...stores.map(s=>s.name)]
+    .map(t=>`<button class="chip" data-q="${esc(t)}">${esc(t)}</button>`).join("");
+  $("hist").innerHTML=store.get(HIST_KEY).map(t=>`<button class="chip" data-q="${esc(t)}">🕘 ${esc(t)}</button>`).join("");
+}
+function renderCards(){
+  $("p-cards").innerHTML=
+   `<h3 class="sec">支払方法の組合せ</h3>`+COMBOS.map(c=>`<div class="box"><h3>${esc(c.name)}</h3><p><b>${esc(c.rate)}</b> ／ ${esc(c.note)}</p></div>`).join("")+
+   `<h3 class="sec">カード一覧（${Object.keys(CARDS).length}枚）</h3>`+
+   Object.values(CARDS).map(c=>`<div class="box"><h3>${esc(c.name)}</h3>
+    <p>基本還元: ${c.base!=null?fmt(c.base)+"%（"+esc(c.baseNote)+"）":esc(c.baseNote)}</p><p>${esc(c.desc)}</p>
+    ${c.src?`<a href="${esc(c.src)}" target="_blank" rel="noopener">参考ページ</a>`:""}</div>`).join("");
+}
+function renderMy(){
+  const my=store.get(LS_KEY);
+  $("my-list").innerHTML=my.length?my.map((m,i)=>`<div class="my-item"><span><b>${esc(m.store)}</b> / ${esc(CARDS[m.card]?.name||m.card)} /
+    ${m.max!=null?"最大"+fmt(m.max)+"% ":""}${esc(m.label)}</span><button data-del="${i}">削除</button></div>`).join("")
+    :'<div class="note">まだありません。</div>';
+}
+function pushHist(q){
+  if(!q) return;
+  const h=[q,...store.get(HIST_KEY).filter(x=>x!==q)].slice(0,8);
+  store.set(HIST_KEY,h);
+}
+
+/* ===== イベント ===== */
+$("q").addEventListener("input",render);
+$("q").addEventListener("change",()=>{pushHist($("q").value.trim());renderChips()});
+document.addEventListener("click",e=>{
+  const b=e.target.closest(".chip"); if(!b) return;
+  $("q").value=b.dataset.q; pushHist(b.dataset.q); renderChips(); render();
+  window.scrollTo({top:0,behavior:"smooth"});
+});
+document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected",x===t));
+  ["search","cards","mine"].forEach(n=>$("p-"+n).hidden=n!==t.dataset.tab);
+}));
+$("f-card").innerHTML=Object.entries(CARDS).map(([id,c])=>`<option value="${id}">${esc(c.name)}</option>`).join("");
+$("form").addEventListener("submit",e=>{
+  e.preventDefault();
+  const n=id=>$(id).value===""?null:parseFloat($(id).value);
+  const my=store.get(LS_KEY);
+  my.push({store:$("f-store").value.trim(),card:$("f-card").value,type:$("f-type").value,
+    base:n("f-base"),max:n("f-max"),label:$("f-label").value.trim(),note:$("f-note").value.trim()});
+  store.set(LS_KEY,my); e.target.reset(); renderMy(); renderChips(); renderToday(); render();
+});
+$("my-list").addEventListener("click",e=>{
+  const i=e.target.dataset.del; if(i==null) return;
+  const my=store.get(LS_KEY); my.splice(+i,1); store.set(LS_KEY,my); renderMy(); renderChips(); render();
+});
+
+renderToday(); renderChips(); renderCards(); renderMy(); render();
+</script>
+</body>
+</html>
