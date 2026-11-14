@@ -1,0 +1,9 @@
+{
+  "name": "住宅再建相談会 受付",
+  "short_name": "相談会受付",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#1d4f91",
+  "icons": []
+}

@@ -1,0 +1,26 @@
+{
+  "name": "soudan-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "住宅再建無料相談会 受付・待ち行列共有アプリ",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:db": "node --test test/db.test.mjs",
+    "dev:api": "node dev/api-shim.mjs"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "pg": "^8.23.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.9"
+  }
+}

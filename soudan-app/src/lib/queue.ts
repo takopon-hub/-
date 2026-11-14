@@ -1,0 +1,119 @@
+import type { Desk, Ticket, Visitor } from './types';
+
+/** 実績が少ないときに使う1回あたりの相談時間(分) */
+export const DEFAULT_MINUTES = 20;
+/** 実績をこの件数以上集めたら平均で置き換える */
+export const MIN_SAMPLES = 3;
+/** 平均に使う直近の件数 */
+export const RECENT_SAMPLES = 10;
+
+const MIN_AVG = 5;
+const MAX_AVG = 60;
+
+const ms = (s: string | null) => (s ? Date.parse(s) : NaN);
+
+/** 相談先ごとの平均相談時間(分)。直近の実績が MIN_SAMPLES 件未満なら DEFAULT_MINUTES。 */
+export function avgMinutes(deskId: number, tickets: Ticket[]): { minutes: number; samples: number } {
+  const done = tickets
+    .filter((t) => t.deskId === deskId && t.status === 'done' && t.startedAt && t.endedAt)
+    .sort((a, b) => ms(b.endedAt) - ms(a.endedAt))
+    .slice(0, RECENT_SAMPLES);
+  if (done.length < MIN_SAMPLES) return { minutes: DEFAULT_MINUTES, samples: done.length };
+  const mean = done.reduce((s, t) => s + (ms(t.endedAt) - ms(t.startedAt)) / 60000, 0) / done.length;
+  return { minutes: Math.min(MAX_AVG, Math.max(MIN_AVG, mean)), samples: done.length };
+}
+
+export interface WaitingEntry {
+  ticket: Ticket;
+  /** この人が呼ばれるまでの目安(分) */
+  waitMinutes: number;
+}
+
+export interface DeskState {
+  desk: Desk;
+  waiting: WaitingEntry[];
+  serving: Ticket[];
+  avg: number;
+  samples: number;
+  /** いま並んだ場合の目安待ち時間(分) */
+  newArrivalWait: number;
+}
+
+/** 5分単位に切り上げる(ホワイトボードに書きやすい)。0 は「すぐ」。 */
+export function roundWait(minutes: number): number {
+  return minutes <= 0 ? 0 : Math.ceil(minutes / 5) * 5;
+}
+
+export function waitLabel(minutes: number): string {
+  const m = roundWait(minutes);
+  return m === 0 ? 'すぐ' : `約${m}分`;
+}
+
+/**
+ * 待ち行列の目安を計算する。
+ * 各ブースの空き見込み = 相談中の人の残り時間(平均 - 経過、最低1分)。空きブースは0。
+ * 待機順に、最も早く空くブースへ割り当てていく。
+ */
+export function deskState(desk: Desk, tickets: Ticket[], nowMs: number): DeskState {
+  const { minutes: avg, samples } = avgMinutes(desk.id, tickets);
+  const mine = tickets.filter((t) => t.deskId === desk.id);
+  const serving = mine
+    .filter((t) => t.status === 'serving')
+    .sort((a, b) => (a.booth ?? 0) - (b.booth ?? 0));
+  const waitingTickets = mine
+    .filter((t) => t.status === 'waiting')
+    .sort((a, b) => ms(a.queuedAt) - ms(b.queuedAt) || a.id.localeCompare(b.id));
+
+  const free: number[] = Array.from({ length: Math.max(desk.booths, 1) }, () => 0);
+  serving.slice(0, free.length).forEach((t, i) => {
+    const elapsed = (nowMs - ms(t.startedAt)) / 60000;
+    free[i] = Math.max(1, avg - (Number.isFinite(elapsed) ? elapsed : 0));
+  });
+
+  const waiting: WaitingEntry[] = waitingTickets.map((ticket) => {
+    const i = free.indexOf(Math.min(...free));
+    const waitMinutes = free[i];
+    free[i] += avg;
+    return { ticket, waitMinutes };
+  });
+  return { desk, waiting, serving, avg, samples, newArrivalWait: Math.min(...free) };
+}
+
+export function allDeskStates(desks: Desk[], tickets: Ticket[], nowMs: number): DeskState[] {
+  return desks.map((d) => deskState(d, tickets, nowMs));
+}
+
+export interface VisitorView {
+  visitor: Visitor;
+  /** 待機中または相談中の待ち札 */
+  current: Ticket | null;
+  /** 古い順の全待ち札 */
+  history: Ticket[];
+  /** 相談を終えた相談先(重複なし) */
+  consultedDeskIds: number[];
+  /** 会場内にいるのに、どこにも並んでいない(次の行き先が未決定) */
+  idle: boolean;
+}
+
+export function visitorViews(visitors: Visitor[], tickets: Ticket[]): VisitorView[] {
+  const byVisitor = new Map<string, Ticket[]>();
+  for (const t of tickets) {
+    const list = byVisitor.get(t.visitorId);
+    if (list) list.push(t);
+    else byVisitor.set(t.visitorId, [t]);
+  }
+  return visitors.map((visitor) => {
+    const history = (byVisitor.get(visitor.id) ?? []).sort(
+      (a, b) => ms(a.queuedAt) - ms(b.queuedAt) || a.id.localeCompare(b.id),
+    );
+    const current = history.find((t) => t.status === 'waiting' || t.status === 'serving') ?? null;
+    const consultedDeskIds = [...new Set(history.filter((t) => t.status === 'done').map((t) => t.deskId))];
+    return { visitor, current, history, consultedDeskIds, idle: visitor.status === 'in' && !current };
+  });
+}
+
+/** サーバー時刻との差(ms)。端末の時計がずれていても経過時間を正しく出す。 */
+export function clockOffset(serverNow: string, clientNowMs: number): number {
+  const s = Date.parse(serverNow);
+  return Number.isFinite(s) ? s - clientNowMs : 0;
+}

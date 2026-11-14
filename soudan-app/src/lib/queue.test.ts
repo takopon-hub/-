@@ -1,0 +1,106 @@
+import { describe, expect, it } from 'vitest';
+import { avgMinutes, deskState, roundWait, visitorViews, waitLabel } from './queue';
+import type { Desk, Ticket, Visitor } from './types';
+
+const T0 = Date.parse('2026-12-05T10:00:00Z');
+const at = (min: number) => new Date(T0 + min * 60000).toISOString();
+const desk = (id: number, booths = 1): Desk => ({ id, name: `d${id}`, booths, active: true, sort: id });
+let n = 0;
+const tk = (p: Partial<Ticket> & Pick<Ticket, 'deskId' | 'status'>): Ticket => ({
+  id: `t${String(++n).padStart(4, '0')}`, visitorId: `v${n}`, booth: null,
+  queuedAt: at(0), startedAt: null, endedAt: null, ...p,
+});
+const done = (deskId: number, mins: number, end = 100) =>
+  tk({ deskId, status: 'done', booth: 1, startedAt: at(end - mins), endedAt: at(end) });
+
+describe('avgMinutes', () => {
+  it('実績が3件未満なら初期値20分', () => {
+    expect(avgMinutes(1, [done(1, 10), done(1, 10)])).toEqual({ minutes: 20, samples: 2 });
+  });
+  it('3件以上なら実績の平均', () => {
+    expect(avgMinutes(1, [done(1, 10, 10), done(1, 20, 40), done(1, 30, 80)]).minutes).toBe(20);
+  });
+  it('直近10件だけを使い、他の相談先は無視する', () => {
+    const old = Array.from({ length: 5 }, (_, i) => done(1, 50, i)); // 古い50分×5
+    const recent = Array.from({ length: 10 }, (_, i) => done(1, 10, 200 + i));
+    expect(avgMinutes(1, [...old, ...recent, done(2, 59, 300)]).minutes).toBe(10);
+  });
+  it('極端な値は 5〜60分に丸める', () => {
+    expect(avgMinutes(1, [done(1, 1, 10), done(1, 1, 20), done(1, 1, 30)]).minutes).toBe(5);
+    expect(avgMinutes(1, [done(1, 90, 100), done(1, 90, 200), done(1, 90, 300)]).minutes).toBe(60);
+  });
+  it('開始時刻のない完了は数えない', () => {
+    const bad = tk({ deskId: 1, status: 'done', endedAt: at(5) });
+    expect(avgMinutes(1, [bad, bad, bad]).samples).toBe(0);
+  });
+});
+
+describe('deskState', () => {
+  it('空の相談先は待ち時間0', () => {
+    const s = deskState(desk(1), [], T0);
+    expect(s.newArrivalWait).toBe(0);
+    expect(waitLabel(s.newArrivalWait)).toBe('すぐ');
+  });
+  it('1ブース: 相談中1人(開始直後)+待ち2人 → 順に約20分・40分、新規は60分', () => {
+    const tickets = [
+      tk({ deskId: 1, status: 'serving', booth: 1, startedAt: at(0) }),
+      tk({ deskId: 1, status: 'waiting', queuedAt: at(1) }),
+      tk({ deskId: 1, status: 'waiting', queuedAt: at(2) }),
+    ];
+    const s = deskState(desk(1), tickets, T0);
+    expect(s.waiting.map((w) => Math.round(w.waitMinutes))).toEqual([20, 40]);
+    expect(Math.round(s.newArrivalWait)).toBe(60);
+  });
+  it('経過時間を差し引く(15分経過なら残り5分)', () => {
+    const tickets = [
+      tk({ deskId: 1, status: 'serving', booth: 1, startedAt: at(0) }),
+      tk({ deskId: 1, status: 'waiting', queuedAt: at(1) }),
+    ];
+    expect(Math.round(deskState(desk(1), tickets, T0 + 15 * 60000).waiting[0].waitMinutes)).toBe(5);
+  });
+  it('超過していても最低1分とみなし、負の待ち時間にならない', () => {
+    const tickets = [
+      tk({ deskId: 1, status: 'serving', booth: 1, startedAt: at(0) }),
+      tk({ deskId: 1, status: 'waiting' }),
+    ];
+    expect(deskState(desk(1), tickets, T0 + 90 * 60000).waiting[0].waitMinutes).toBe(1);
+  });
+  it('2ブース: 待ち4人は2人ずつ並行して進む', () => {
+    const tickets = [
+      tk({ deskId: 1, status: 'serving', booth: 1, startedAt: at(0) }),
+      tk({ deskId: 1, status: 'serving', booth: 2, startedAt: at(0) }),
+      ...[1, 2, 3, 4].map((i) => tk({ deskId: 1, status: 'waiting', queuedAt: at(i) })),
+    ];
+    const s = deskState(desk(1, 2), tickets, T0);
+    expect(s.waiting.map((w) => Math.round(w.waitMinutes))).toEqual([20, 20, 40, 40]);
+  });
+  it('待機順は並んだ時刻順(並び直しは最後尾)', () => {
+    const a = tk({ deskId: 1, status: 'waiting', queuedAt: at(5) });
+    const b = tk({ deskId: 1, status: 'waiting', queuedAt: at(3) });
+    expect(deskState(desk(1), [a, b], T0).waiting.map((w) => w.ticket.id)).toEqual([b.id, a.id]);
+  });
+});
+
+describe('roundWait', () => {
+  it('5分単位に切り上げる', () => {
+    expect([0, 1, 5, 6, 20.1].map(roundWait)).toEqual([0, 5, 5, 10, 25]);
+  });
+});
+
+describe('visitorViews', () => {
+  const v = (id: string, status: 'in' | 'left' = 'in'): Visitor => ({
+    id, no: 1, surname: 'x', status, leaveKind: status === 'left' ? 'done' : null, createdAt: at(0),
+  });
+  it('履歴・現在地・相談済み・未決定を判定する', () => {
+    const t1 = tk({ deskId: 1, status: 'done', visitorId: 'a', queuedAt: at(0) });
+    const t2 = tk({ deskId: 2, status: 'waiting', visitorId: 'a', queuedAt: at(30) });
+    const t3 = tk({ deskId: 3, status: 'done', visitorId: 'b' });
+    const [a, b, c] = visitorViews([v('a'), v('b'), v('c', 'left')], [t2, t1, t3]);
+    expect(a.history.map((t) => t.deskId)).toEqual([1, 2]);
+    expect(a.current?.deskId).toBe(2);
+    expect(a.consultedDeskIds).toEqual([1]);
+    expect(a.idle).toBe(false);
+    expect(b.idle).toBe(true);     // 会場内でどこにも並んでいない
+    expect(c.idle).toBe(false);    // 帰宅済みは未決定ではない
+  });
+});
