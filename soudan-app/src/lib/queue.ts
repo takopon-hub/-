@@ -60,9 +60,8 @@ export function deskState(desk: Desk, tickets: Ticket[], nowMs: number): DeskSta
   const serving = mine
     .filter((t) => t.status === 'serving')
     .sort((a, b) => (a.booth ?? 0) - (b.booth ?? 0));
-  const waitingTickets = mine
-    .filter((t) => t.status === 'waiting')
-    .sort((a, b) => ms(a.queuedAt) - ms(b.queuedAt) || a.id.localeCompare(b.id));
+  // 待機順はサーバーが返した並び(queue_at, id 順)をそのまま使う。離席による入れ替えもこの順に反映される。
+  const waitingTickets = mine.filter((t) => t.status === 'waiting');
 
   const free: number[] = Array.from({ length: Math.max(desk.booths, 1) }, () => 0);
   serving.slice(0, free.length).forEach((t, i) => {
@@ -83,6 +82,18 @@ export function allDeskStates(desks: Desk[], tickets: Ticket[], nowMs: number): 
   return desks.map((d) => deskState(d, tickets, nowMs));
 }
 
+/** ボードの色分け用の段階。0=待ちなし 1=薄黄(1人) 2〜4=薄赤→濃い赤(2〜4人) 5=赤(5人以上) */
+export function waitLevel(waitingCount: number): 0 | 1 | 2 | 3 | 4 | 5 {
+  if (waitingCount <= 0) return 0;
+  if (waitingCount === 1) return 1;
+  if (waitingCount >= 5) return 5;
+  return waitingCount as 2 | 3 | 4;
+}
+
+/** 相談時間がこの分数を超えたら強調表示する */
+export const OVERTIME_MINUTES = 20;
+export const isOvertime = (elapsedMinutes: number | null) => elapsedMinutes !== null && elapsedMinutes >= OVERTIME_MINUTES;
+
 export interface VisitorView {
   visitor: Visitor;
   /** 待機中または相談中の待ち札 */
@@ -93,6 +104,8 @@ export interface VisitorView {
   consultedDeskIds: number[];
   /** 会場内にいるのに、どこにも並んでいない(次の行き先が未決定) */
   idle: boolean;
+  /** 希望していて、まだ相談していない(いま並んでいる先も除く)相談先 */
+  wishesLeft: number[];
 }
 
 export function visitorViews(visitors: Visitor[], tickets: Ticket[]): VisitorView[] {
@@ -108,7 +121,10 @@ export function visitorViews(visitors: Visitor[], tickets: Ticket[]): VisitorVie
     );
     const current = history.find((t) => t.status === 'waiting' || t.status === 'serving') ?? null;
     const consultedDeskIds = [...new Set(history.filter((t) => t.status === 'done').map((t) => t.deskId))];
-    return { visitor, current, history, consultedDeskIds, idle: visitor.status === 'in' && !current };
+    const wishesLeft = visitor.status === 'left'
+      ? []
+      : visitor.wishes.filter((d) => !consultedDeskIds.includes(d) && d !== current?.deskId);
+    return { visitor, current, history, consultedDeskIds, idle: visitor.status === 'in' && !current, wishesLeft };
   });
 }
 

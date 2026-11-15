@@ -20,7 +20,7 @@ http.createServer(async (req, res) => {
   let args;
   try { args = raw ? JSON.parse(raw) : {}; } catch { return send(res, 400, { message: 'bad json' }); }
   const keys = Object.keys(args).filter((k) => /^p_[a-z_]+$/.test(k));
-  const params = keys.map((k) => (args[k] === null ? null : typeof args[k] === 'object' ? JSON.stringify(args[k]) : String(args[k])));
+  const params = keys.map((k) => (args[k] === null ? null : Array.isArray(args[k]) ? args[k] : typeof args[k] === 'object' ? JSON.stringify(args[k]) : String(args[k])));
   const sql = `select public.${m[1]}(${keys.map((k, i) => `${k} => $${i + 1}`).join(', ')}) as r`;
   try {
     const r = await pool.query(sql, params);

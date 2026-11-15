@@ -1,10 +1,12 @@
 export type Role = 'operator' | 'viewer';
-export type LeaveKind = 'done' | 'carryover' | 'dropped';
-export type TicketStatus = 'waiting' | 'serving' | 'done' | 'cancelled';
+export type TicketStatus = 'waiting' | 'serving' | 'done' | 'cancelled' | 'moved';
+/** public=公的機関等 / private=民間協会 / finance=金融機関 */
+export type Category = 'public' | 'private' | 'finance';
 
 export interface Desk {
   id: number;
   name: string;
+  category: Category;
   booths: number;
   active: boolean;
   sort: number;
@@ -15,10 +17,10 @@ export interface Visitor {
   no: number;
   surname: string;
   status: 'in' | 'left';
-  leaveKind: LeaveKind | null;
+  /** 相談を希望する相談先(最初に並ぶ先を含む。あとから並んだ先も加わる) */
+  wishes: number[];
   createdAt: string;
   /** 操作者にだけ含まれる */
-  phone?: string;
   memo?: string;
 }
 
@@ -28,7 +30,10 @@ export interface Ticket {
   deskId: number;
   status: TicketStatus;
   booth: number | null;
+  /** 実際に並んだ時刻 */
   queuedAt: string;
+  /** 行列内の順序(離席による入れ替えで変わる)。snapshot の配列はこの順に並んでいる */
+  queueAt: string;
   startedAt: string | null;
   endedAt: string | null;
 }

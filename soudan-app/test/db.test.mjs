@@ -18,156 +18,201 @@ const VW = 'viewer-pass-22';
 let db;
 
 async function rpc(fn, args = []) {
-  // PostgREST の rpc 呼び出し相当: select public.fn(...)
   const ph = args.map((_, i) => `$${i + 1}`).join(', ');
   const r = await db.query(`select public.${fn}(${ph}) as r`, args);
   return r.rows[0].r;
 }
 const fails = (promise, code) => assert.rejects(promise, (e) => e.message.startsWith(code), `expected ${code}`);
 
+const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
 before(async () => {
   if (skip) return;
   db = new pg.Client({ connectionString: url });
   await db.connect();
   await db.query('drop schema if exists app cascade');
-  await db.query(readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8'));
+  await db.query(schema);
   await db.query('select app.init_passcodes($1, $2)', [OP, VW]);
 });
 after(async () => { if (db) await db.end(); });
 
-async function reg(surname = '山田', desk = 1, phone = '090-1234-5678') {
+const deskId = async (name) => (await db.query('select id from app.desk where name = $1', [name])).rows[0].id;
+async function reg(surname = '山田', desk = 1, wishes = []) {
   const v = uuid(), t = uuid();
-  const r = await rpc('register_visitor', [OP, v, t, surname, phone, desk, '']);
+  const r = await rpc('register_visitor', [OP, v, t, surname, desk, wishes, '']);
   return { v, t, no: r.no };
 }
 const snap = (pass = OP) => rpc('snapshot', [pass]);
-const deskId = async (name) => (await db.query('select id from app.desk where name = $1', [name])).rows[0].id;
+const queue = async (desk) => (await snap()).tickets.filter((t) => t.deskId === desk && t.status === 'waiting').map((t) => t.visitorId);
+
+test('schema.sql は再実行できる(関数の定義が重複しない)', { skip }, async () => {
+  await db.query(schema);
+  const n = (await db.query(`select count(*)::int n from pg_proc where pronamespace = 'public'::regnamespace and proname = 'snapshot'`)).rows[0].n;
+  assert.equal(n, 1);
+  assert.ok((await snap()).desks.length === 16, '再実行で相談先が増えない');
+});
+
+test('相談先は区分つきで、公的→民間→金融の順。弁護士会・建築士事務所協会は①②に分かれる', { skip }, async () => {
+  const d = (await snap()).desks;
+  assert.deepEqual(d.map((x) => x.name).slice(0, 6),
+    ['熊本弁護士会①', '熊本弁護士会②', '八代市', '建築士事務所協会①', '建築士事務所協会②', '賃貸住宅経営者協会']);
+  assert.deepEqual([...new Set(d.map((x) => x.category))], ['public', 'private', 'finance']);
+  assert.ok(d.every((x) => x.booths === 1));
+});
 
 test('パスコード: 不一致は拒否、閲覧者は更新できない', { skip }, async () => {
   await fails(rpc('snapshot', ['wrong']), 'E_AUTH');
   await fails(rpc('snapshot', ['']), 'E_AUTH');
-  await fails(rpc('register_visitor', [VW, uuid(), uuid(), '山田', '09012345678', 1, '']), 'E_FORBIDDEN');
+  await fails(rpc('register_visitor', [VW, uuid(), uuid(), '山田', 1, [], '']), 'E_FORBIDDEN');
   await fails(rpc('purge_all', [VW, '全データを削除', false]), 'E_FORBIDDEN');
   await fails(rpc('get_log', [VW]), 'E_FORBIDDEN');
 });
 
-test('閲覧者のスナップショットに電話番号・メモが含まれない', { skip }, async () => {
-  const a = await reg('佐藤', 1, '080-9999-0000');
-  const op = await snap(OP);
-  const vw = await snap(VW);
-  assert.equal(op.role, 'operator');
-  assert.equal(vw.role, 'viewer');
-  const o = op.visitors.find((x) => x.id === a.v);
-  const w = vw.visitors.find((x) => x.id === a.v);
-  assert.equal(o.phone, '08099990000');
-  assert.equal(w.surname, '佐藤');
-  assert.ok(!('phone' in w) && !('memo' in w));
-  assert.ok(!JSON.stringify(vw).includes('08099990000'));
+test('個人情報は苗字だけ。電話番号の列は存在せず、閲覧者にはメモも返らない', { skip }, async () => {
+  const cols = (await db.query(`select column_name from information_schema.columns where table_schema = 'app' and table_name = 'visitor'`)).rows.map((r) => r.column_name);
+  assert.ok(!cols.includes('phone'));
+  const a = await reg('佐藤', 1);
+  await rpc('update_visitor', [OP, a.v, '佐藤', '要配慮', [1]]);
+  const o = (await snap(OP)).visitors.find((x) => x.id === a.v);
+  const w = (await snap(VW)).visitors.find((x) => x.id === a.v);
+  assert.equal(o.memo, '要配慮');
+  assert.ok(!('memo' in w));
+  assert.ok(!JSON.stringify(await snap(VW)).includes('要配慮'));
 });
 
 test('受付: 番号は連番、再送しても同じ番号で二重登録されない', { skip }, async () => {
   const v = uuid(), t = uuid();
-  const r1 = await rpc('register_visitor', [OP, v, t, '鈴木', '09011112222', 2, '']);
-  const r2 = await rpc('register_visitor', [OP, v, t, '鈴木', '09011112222', 2, '']);
+  const r1 = await rpc('register_visitor', [OP, v, t, '鈴木', 2, [], '']);
+  const r2 = await rpc('register_visitor', [OP, v, t, '鈴木', 2, [], '']);
   assert.equal(r1.no, r2.no);
   assert.equal(r2.already, true);
-  const next = await reg('高橋');
-  assert.equal(next.no, r1.no + 1);
+  assert.equal((await reg('高橋')).no, r1.no + 1);
 });
 
-test('入力チェック: 電話番号・苗字・メモ・休止中の相談先', { skip }, async () => {
-  const args = (s, p, d, m = '') => [OP, uuid(), uuid(), s, p, d, m];
-  await fails(rpc('register_visitor', args('山田', '123', 1)), 'E_INPUT');
-  await fails(rpc('register_visitor', args('', '09011112222', 1)), 'E_INPUT');
-  await fails(rpc('register_visitor', args('山田', '09011112222', 1, 'あ'.repeat(61))), 'E_INPUT');
+test('受付: 希望先を複数記録でき、最初に並ぶ先も希望先に含まれる', { skip }, async () => {
+  const a = await reg('希望', 3, [5, 7]);
+  const v = (await snap()).visitors.find((x) => x.id === a.v);
+  assert.deepEqual(v.wishes, [3, 5, 7]);
+  await fails(rpc('register_visitor', [OP, uuid(), uuid(), '不正', 1, [999], '']), 'E_INPUT');
+  // 希望なしで受付だけ(最初の相談先を決めない)もできる
+  const r = await rpc('register_visitor', [OP, uuid(), uuid(), '先未定', null, [], '']);
+  assert.ok(r.no > 0);
+});
+
+test('入力チェック: 苗字・メモ・休止中の相談先', { skip }, async () => {
+  const args = (s, d, m = '') => [OP, uuid(), uuid(), s, d, [], m];
+  await fails(rpc('register_visitor', args('', 1)), 'E_INPUT');
+  await fails(rpc('register_visitor', args('山'.repeat(21), 1)), 'E_INPUT');
+  await fails(rpc('register_visitor', args('山田', 1, 'あ'.repeat(61))), 'E_INPUT');
   await db.query('update app.desk set active = false where id = 3');
-  await fails(rpc('register_visitor', args('山田', '09011112222', 3)), 'E_DESK_CLOSED');
+  await fails(rpc('register_visitor', args('山田', 3)), 'E_DESK_CLOSED');
   await db.query('update app.desk set active = true where id = 3');
 });
 
-test('並び直しは最後尾に入り、同時に2つの行列には並べない', { skip }, async () => {
+test('次の相談先に並ぶと最後尾に入り、希望先にも加わる。同時に2つの行列には並べない', { skip }, async () => {
   const a = await reg('A1', 4), b = await reg('B1', 4);
   await rpc('start_ticket', [OP, a.t, null]);
   await rpc('finish_ticket', [OP, a.t]);
-  await fails(rpc('enqueue', [OP, uuid(), b.v, 5]), 'E_ALREADY_ACTIVE'); // b は4番で待機中
+  await fails(rpc('enqueue', [OP, uuid(), b.v, 5]), 'E_ALREADY_ACTIVE');   // b は4番で待機中
   const t2 = uuid();
-  await rpc('enqueue', [OP, t2, a.v, 4]);   // a は4番へ再度並ぶ → b の後ろ
+  await rpc('enqueue', [OP, t2, a.v, 4]);
+  assert.deepEqual(await queue(4), [b.v, a.v]);
+  assert.equal((await rpc('enqueue', [OP, t2, a.v, 4])).already, true);    // 再送は無視
+  await rpc('cancel_ticket', [OP, t2]);
+  await rpc('enqueue', [OP, uuid(), a.v, 11]);                              // 希望になかった先にも並べる
+  assert.ok((await snap()).visitors.find((x) => x.id === a.v).wishes.includes(11));
+});
+
+test('離席: 呼ばれた人と次の人の順番を入れ替える。再送しても元に戻らない', { skip }, async () => {
+  const d = await deskId('熊本信用金庫');
+  const [a, b, c] = [await reg('S1', d), await reg('S2', d), await reg('S3', d)];
+  assert.deepEqual(await queue(d), [a.v, b.v, c.v]);
+  await rpc('swap_tickets', [OP, a.t, b.t]);                                // a が離席 → a と b を入れ替え
+  assert.deepEqual(await queue(d), [b.v, a.v, c.v]);
+  assert.equal((await rpc('swap_tickets', [OP, a.t, b.t])).already, true);  // 再送は何もしない
+  assert.deepEqual(await queue(d), [b.v, a.v, c.v]);
+  await rpc('start_ticket', [OP, b.t, null]);                               // b を先に案内
+  await fails(rpc('swap_tickets', [OP, a.t, b.t]), 'E_BAD_STATE');          // b は相談中なので入れ替え不可
+  // 履歴上の「並んだ時刻」は入れ替えても変わらない
+  const t = (await snap()).tickets.find((x) => x.id === a.t);
+  assert.ok(Date.parse(t.queuedAt) <= Date.parse(t.queueAt));
+});
+
+test('離席の入れ替え: 別々の相談先の札は入れ替えられない', { skip }, async () => {
+  const [a, b] = [await reg('X1', 12), await reg('X2', 13)];
+  await fails(rpc('swap_tickets', [OP, a.t, b.t]), 'E_BAD_STATE');
+});
+
+test('付け替え: 新しい行列の最後尾に入り、元の札は付け替え済みになる。再送は無視', { skip }, async () => {
+  const [from, to] = [await deskId('肥後銀行'), await deskId('熊本銀行')];
+  const [m1, m2] = [await reg('M1', to), await reg('M2', from)];
+  const nt = uuid();
+  await rpc('move_ticket', [OP, m2.t, nt, to]);
+  assert.deepEqual(await queue(to), [m1.v, m2.v]);
   const s = await snap();
-  const q = s.tickets.filter((t) => t.deskId === 4 && t.status === 'waiting').map((t) => t.visitorId);
-  assert.deepEqual(q, [b.v, a.v]);
-  assert.equal((await rpc('enqueue', [OP, t2, a.v, 4])).already, true);   // 再送は無視
+  assert.equal(s.tickets.find((x) => x.id === m2.t).status, 'moved');
+  assert.equal((await rpc('move_ticket', [OP, m2.t, nt, to])).already, true);
+  await fails(rpc('move_ticket', [OP, nt, uuid(), to]), 'E_INPUT');          // 同じ相談先へは付け替えられない
+  await rpc('start_ticket', [OP, nt, null]);
+  await fails(rpc('move_ticket', [OP, nt, uuid(), from]), 'E_BAD_STATE');   // 相談中は付け替え不可
+  await fails(rpc('cancel_ticket', [OP, m2.t]), 'E_BAD_STATE');             // 付け替え済みは取り消せない
 });
 
-test('ブース: 同時対応数を超えて開始できない。2ブースなら2人まで', { skip }, async () => {
-  const d1 = await deskId('肥後銀行');      // 1ブース
-  const d2 = await deskId('熊本弁護士会');  // 2ブース
-  const [x, y] = [await reg('X', d1), await reg('Y', d1)];
-  await rpc('start_ticket', [OP, x.t, null]);
-  await fails(rpc('start_ticket', [OP, y.t, null]), 'E_NO_BOOTH');
-  const [p, q, r] = [await reg('P', d2), await reg('Q', d2), await reg('R', d2)];
-  assert.equal((await rpc('start_ticket', [OP, p.t, null])).booth, 1);
-  assert.equal((await rpc('start_ticket', [OP, q.t, null])).booth, 2);
-  await fails(rpc('start_ticket', [OP, r.t, null]), 'E_NO_BOOTH');
-  await rpc('finish_ticket', [OP, p.t]);
-  assert.equal((await rpc('start_ticket', [OP, r.t, null])).booth, 1);       // 空いたブースを再利用
-  assert.equal((await rpc('start_ticket', [OP, r.t, null])).already, true);  // 再送
-});
-
-test('同時に開始しても、1ブースで2人が相談中にならない', { skip }, async () => {
+test('相談先ごとに1人ずつ。同時に開始しても1ブースで2人が相談中にならない', { skip }, async () => {
   const d = await deskId('八代市');
-  const [a, b] = [await reg('C1', d), await reg('C2', d)];
+  const [x, y] = [await reg('Y1', d), await reg('Y2', d)];
   const other = new pg.Client({ connectionString: url });
   await other.connect();
   const call = (c, t) => c.query('select public.start_ticket($1,$2,null)', [OP, t]).then(() => 'ok', (e) => e.message.slice(0, 10));
-  const res = await Promise.all([call(db, a.t), call(other, b.t)]);
+  const res = await Promise.all([call(db, x.t), call(other, y.t)]);
   await other.end();
   assert.deepEqual(res.sort(), ['E_NO_BOOTH', 'ok']);
+  assert.equal((await rpc('start_ticket', [OP, x.t, null])).already ?? true, true);
 });
 
-test('終了・取消・帰宅の再送は成功扱い、取消後の操作は拒否', { skip }, async () => {
+test('終了・取消・帰宅の再送は成功扱い、帰宅後は並べない', { skip }, async () => {
   const a = await reg('D1', 9);
-  await fails(rpc('finish_ticket', [OP, a.t]), 'E_BAD_STATE');   // 待機中は終了できない
+  await fails(rpc('finish_ticket', [OP, a.t]), 'E_BAD_STATE');
   await rpc('start_ticket', [OP, a.t, null]);
   await rpc('finish_ticket', [OP, a.t]);
   assert.equal((await rpc('finish_ticket', [OP, a.t])).already, true);
-  await fails(rpc('cancel_ticket', [OP, a.t]), 'E_BAD_STATE');   // 終了済みは取消不可
-  await rpc('leave_visitor', [OP, a.v, 'carryover']);
-  assert.equal((await rpc('leave_visitor', [OP, a.v, 'carryover'])).already, true);
+  await fails(rpc('cancel_ticket', [OP, a.t]), 'E_BAD_STATE');
+  await rpc('leave_visitor', [OP, a.v]);
+  assert.equal((await rpc('leave_visitor', [OP, a.v])).already, true);
   await fails(rpc('enqueue', [OP, uuid(), a.v, 9]), 'E_VISITOR_LEFT');
-  const v = (await snap()).visitors.find((x) => x.id === a.v);
-  assert.deepEqual([v.status, v.leaveKind], ['left', 'carryover']);
+  assert.equal((await snap()).visitors.find((x) => x.id === a.v).status, 'left');
 });
 
-test('帰宅: 相談中は不可、待機中の札は自動で取り消される', { skip }, async () => {
+test('帰宅: 相談中は不可、待機中の札は自動で取り消され、帰宅は取り消せる', { skip }, async () => {
   const a = await reg('E1', 10);
   await rpc('start_ticket', [OP, a.t, null]);
-  await fails(rpc('leave_visitor', [OP, a.v, 'dropped']), 'E_SERVING');
-  await rpc('revert_ticket', [OP, a.t]);                           // 相談中 → 待機中
-  await rpc('leave_visitor', [OP, a.v, 'dropped']);
+  await fails(rpc('leave_visitor', [OP, a.v]), 'E_SERVING');
+  await rpc('revert_ticket', [OP, a.t]);
+  await rpc('leave_visitor', [OP, a.v]);
   assert.equal((await snap()).tickets.find((x) => x.id === a.t).status, 'cancelled');
   await rpc('reopen_visitor', [OP, a.v]);
-  await rpc('revert_ticket', [OP, a.t]);                           // 取消 → 待機中
+  await rpc('revert_ticket', [OP, a.t]);
   assert.equal((await snap()).tickets.find((x) => x.id === a.t).status, 'waiting');
 });
 
-test('操作を戻す: 終了→相談中、元のブースが埋まっていれば別の空きブース', { skip }, async () => {
-  const d2 = await deskId('建築士事務所協会');
-  const [a, b] = [await reg('F1', d2), await reg('F2', d2)];
-  await rpc('start_ticket', [OP, a.t, null]);   // ブース1
+test('操作を戻す: 終了→相談中。別の人が相談中なら戻せない', { skip }, async () => {
+  const d = await deskId('JA八代');
+  const [a, b] = [await reg('F1', d), await reg('F2', d)];
+  await rpc('start_ticket', [OP, a.t, null]);
   await rpc('finish_ticket', [OP, a.t]);
-  await rpc('start_ticket', [OP, b.t, null]);   // 空いたブース1を使用
-  await rpc('revert_ticket', [OP, a.t]);        // a は元のブース1が埋まっているのでブース2へ
-  const t = (await snap()).tickets.find((x) => x.id === a.t);
-  assert.deepEqual([t.status, t.booth], ['serving', 2]);
+  await rpc('revert_ticket', [OP, a.t]);
+  assert.equal((await snap()).tickets.find((x) => x.id === a.t).status, 'serving');
+  await rpc('finish_ticket', [OP, a.t]);
+  await rpc('start_ticket', [OP, b.t, null]);
+  await fails(rpc('revert_ticket', [OP, a.t]), 'E_NO_BOOTH');
 });
 
-test('相談先の追加・変更と、パスコード変更', { skip }, async () => {
-  const r = await rpc('upsert_desk', [OP, null, '臨時窓口', 1, true, 999]);
-  assert.ok(r.id > 14);
-  await rpc('upsert_desk', [OP, r.id, '臨時窓口', 2, false, 999]);
+test('相談先の追加・変更・区分、パスコード変更', { skip }, async () => {
+  const r = await rpc('upsert_desk', [OP, null, '臨時窓口', 'public', true, 999]);
+  await rpc('upsert_desk', [OP, r.id, '臨時窓口2', 'private', false, 998]);
   const d = (await snap()).desks.find((x) => x.id === r.id);
-  assert.deepEqual([d.booths, d.active], [2, false]);
-  await fails(rpc('upsert_desk', [OP, null, '', 1, true, 0]), 'E_INPUT');
+  assert.deepEqual([d.name, d.category, d.active, d.sort], ['臨時窓口2', 'private', false, 998]);
+  await fails(rpc('upsert_desk', [OP, null, '', 'public', true, 0]), 'E_INPUT');
+  await fails(rpc('upsert_desk', [OP, null, 'x', 'bad', true, 0]), 'E_INPUT');
   await fails(rpc('set_passcodes', [OP, 'short', 'another-long-1']), 'E_WEAK');
   await fails(rpc('set_passcodes', [OP, 'same-pass-123', 'same-pass-123']), 'E_SAME');
   await rpc('set_passcodes', [OP, OP + 'x', VW + 'x']);
@@ -176,21 +221,23 @@ test('相談先の追加・変更と、パスコード変更', { skip }, async (
   assert.equal((await snap()).role, 'operator');
 });
 
-test('操作ログに氏名・電話番号が入らない', { skip }, async () => {
-  await reg('個人情報テスト', 1, '070-5555-6666');
+test('操作ログに苗字が入らない', { skip }, async () => {
+  await reg('個人情報テスト', 1);
   const log = JSON.stringify(await rpc('get_log', [OP]));
   assert.ok(log.length > 10);
-  assert.ok(!log.includes('個人情報テスト') && !log.includes('07055556666'));
+  assert.ok(!log.includes('個人情報テスト'));
 });
 
-test('全削除: 確認文字が必要。個人情報とログが消え、相談先は残り、パスコードを無効化できる', { skip }, async () => {
+test('全削除: 確認文字が必要。相談者・待ち札・ログが消え、相談先は残り、パスコードを無効化できる', { skip }, async () => {
   await fails(rpc('purge_all', [OP, 'delete', false]), 'E_CONFIRM');
-  const r = await rpc('purge_all', [OP, '全データを削除', true]);
+  const r = await rpc('purge_all', [OP, '全データを削除', false]);
   assert.ok(r.deletedVisitors > 0);
   for (const t of ['visitor', 'ticket', 'op_log']) {
     assert.equal((await db.query(`select count(*)::int n from app.${t}`)).rows[0].n, 0);
   }
-  assert.ok((await db.query('select count(*)::int n from app.desk')).rows[0].n >= 14);
-  await fails(rpc('snapshot', [OP]), 'E_AUTH');   // パスコード失効
+  assert.ok((await db.query('select count(*)::int n from app.desk')).rows[0].n >= 16);
+  assert.equal((await snap()).role, 'operator');                          // パスコードは残る
+  await rpc('purge_all', [OP, '全データを削除', true]);
+  await fails(rpc('snapshot', [OP]), 'E_AUTH');                           // パスコード失効
   await fails(rpc('snapshot', [VW]), 'E_AUTH');
 });

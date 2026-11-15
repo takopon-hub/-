@@ -4,6 +4,9 @@
   --wait: #8a5a00; --wait-bg: #fff1cf; --serve: #0b6b3a; --serve-bg: #d9f3e4;
   --done: #3b4a5f; --done-bg: #e4e9f0; --warn: #9a3412; --warn-bg: #ffe4d6;
   --danger: #b3261e; --off: #6b7280;
+  --cat-public: #1d4f91; --cat-private: #0b7a5c; --cat-finance: #7a3fb8;
+  --lv1: #fff3b0; --lv2: #ffe1de; --lv3: #ffc2bc; --lv4: #ff8f86; --lv5: #d93025;
+  --over: #c62828;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -12,6 +15,9 @@
     --wait: #ffd37a; --wait-bg: #4a3a12; --serve: #7be0a6; --serve-bg: #123a27;
     --done: #b9c6d8; --done-bg: #2a3544; --warn: #ffb48a; --warn-bg: #4a2a18;
     --danger: #ff8a80; --off: #94a0b0;
+    --cat-public: #7fb0f5; --cat-private: #52d1a8; --cat-finance: #c49bff;
+    --lv1: #5a4d10; --lv2: #4d2a28; --lv3: #6e302b; --lv4: #8f3a32; --lv5: #c62828;
+    --over: #e53935;
   }
 }
 * { box-sizing: border-box; }
@@ -138,3 +144,51 @@ legend { font-weight: 700; font-size: 14px; padding: 0; margin-bottom: 6px; }
 .toast.error { background: var(--danger); }
 
 @media (prefers-reduced-motion: no-preference) { .sheet { animation: up .18s ease-out; } @keyframes up { from { transform: translateY(24px); opacity: .6; } } }
+
+/* ---- 区分(公的機関等 / 民間協会 / 金融機関)の色分け */
+.cat-public { --cat: var(--cat-public); } .cat-private { --cat: var(--cat-private); } .cat-finance { --cat: var(--cat-finance); }
+.cat-bar { border-left: 8px solid var(--cat, var(--line)); }
+.cat-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 99px; color: #fff; background: var(--cat); white-space: nowrap; }
+@media (prefers-color-scheme: dark) { .cat-tag { color: #0b1220; } }
+.group-title { font-size: 16px; margin: 18px 0 8px; padding: 6px 12px; border-left: 8px solid var(--cat, var(--primary)); background: var(--card); border-radius: 0 10px 10px 0; color: var(--cat, var(--text)); }
+.mine-title { --cat: var(--primary); }
+.group-label { font-size: 13px; font-weight: 700; margin: 10px 0 4px; color: var(--cat); }
+.radio-group { margin-bottom: 4px; }
+.cat-chip.on { background: var(--cat); border-color: var(--cat); color: #fff; }
+@media (prefers-color-scheme: dark) { .cat-chip.on { color: #0b1220; } }
+.cat-chip { border-left: 6px solid var(--cat); }
+
+/* ---- 待ち人数の色分け: 1人=薄黄 / 2〜4人=薄赤→濃い赤 / 5人以上=赤 */
+.desk.lv1 { background: var(--lv1); } .desk.lv2 { background: var(--lv2); } .desk.lv3 { background: var(--lv3); }
+.desk.lv4 { background: var(--lv4); } .desk.lv5 { background: var(--lv5); color: #fff; }
+.desk.lv5 small, .desk.lv5 .count span, .desk.lv5 .count em { color: #fff; }
+.desk.lv5 .chips li { background: rgba(255,255,255,.9); color: #8c1d18; }
+.desk.lv1 .chips li, .desk.lv2 .chips li, .desk.lv3 .chips li, .desk.lv4 .chips li { background: rgba(255,255,255,.75); color: var(--text); }
+.count b { font-size: 40px; }
+.count b.hot { color: inherit; }
+.legend { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 4px; font-size: 12px; font-weight: 700; }
+.lg { padding: 2px 10px; border-radius: 6px; border: 1px solid var(--line); }
+.lg.lv1 { background: var(--lv1); } .lg.lv2 { background: var(--lv2); } .lg.lv3 { background: var(--lv3); } .lg.lv4 { background: var(--lv4); } .lg.lv5 { background: var(--lv5); color: #fff; }
+
+/* ---- 相談中の経過時間: 大きく、20分を超えたら赤で強調 */
+.serving li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 4px 0; font-size: 15px; }
+.serving .who { font-weight: 700; }
+.elapsed { display: inline-flex; align-items: baseline; gap: 2px; margin-left: auto; padding: 2px 10px; border-radius: 8px; background: var(--serve-bg); color: var(--serve); font-weight: 700; font-size: 14px; white-space: nowrap; }
+.elapsed b { font-size: 24px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.elapsed em { font-style: normal; margin-left: 6px; font-size: 12px; background: #fff; color: var(--over); padding: 0 6px; border-radius: 99px; }
+.elapsed.over { background: var(--over); color: #fff; animation: pulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .elapsed.over { animation: none; } }
+@keyframes pulse { 50% { box-shadow: 0 0 0 4px rgba(198,40,40,.3); } }
+
+/* ---- 相談先画面の行・希望先 */
+.item.stack { flex-direction: column; align-items: stretch; gap: 8px; }
+.line { display: flex; align-items: center; gap: 8px; }
+.sub-actions { flex-wrap: wrap; padding-left: 36px; }
+.wish { display: inline-block; margin: 0 6px 4px 0; padding: 1px 8px; border-radius: 99px; background: var(--wait-bg); color: var(--wait); font-size: 13px; font-weight: 600; }
+.wish.done { background: var(--done-bg); color: var(--done); text-decoration: line-through; }
+.kv { grid-template-columns: 8em 1fr; }
+
+/* 受付フォームの相談先ラジオ: .form label の display:block に負けないようにする */
+.form label.radio { display: flex; align-items: center; gap: 10px; }
+.form label.radio .grow { font-weight: 700; }
+.form label.radio > span:last-child { font-size: 13px; color: var(--sub); white-space: nowrap; }

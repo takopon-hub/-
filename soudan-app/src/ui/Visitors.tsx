@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store';
 import type { VisitorView } from '../lib/queue';
-import { LEAVE_LABEL, TICKET_LABEL, pad3 } from '../lib/format';
+import { TICKET_LABEL, pad3 } from '../lib/format';
 import { Badge, Empty, useDeskMap } from './common';
 
 type Filter = 'all' | 'in' | 'idle' | 'left';
 
 export function whereLabel(v: VisitorView, deskName: (id: number) => string): { kind: 'wait' | 'serve' | 'done' | 'warn'; text: string } {
-  if (v.visitor.status === 'left') return { kind: 'done', text: v.visitor.leaveKind ? LEAVE_LABEL[v.visitor.leaveKind] : '帰宅' };
+  if (v.visitor.status === 'left') return { kind: 'done', text: '帰宅' };
   if (v.current) return { kind: v.current.status === 'serving' ? 'serve' : 'wait', text: `${deskName(v.current.deskId)} ${TICKET_LABEL[v.current.status]}` };
   return { kind: 'warn', text: '次の行き先が未決定' };
 }
@@ -43,7 +43,7 @@ export function Visitors({ initial }: { initial?: Filter }) {
               <a className="row-btn" href={`#/visitor/${v.visitor.id}`}>
                 <b className="no">{pad3(v.visitor.no)}</b>
                 <span className="grow"><strong>{v.visitor.surname}</strong>
-                  <small className="sub-line">相談済み {v.consultedDeskIds.length}か所</small></span>
+                  <small className="sub-line">相談済み {v.consultedDeskIds.length}か所{v.wishesLeft.length > 0 && ` / 希望あと${v.wishesLeft.length}か所`}</small></span>
                 <Badge kind={w.kind}>{w.text}</Badge>
               </a>
             </li>

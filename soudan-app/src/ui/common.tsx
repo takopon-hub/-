@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useStore } from '../lib/store';
-import type { Desk } from '../lib/types';
+import { isOvertime } from '../lib/queue';
+import { CATEGORY_LABEL, minutesBetween } from '../lib/format';
+import type { Category, Desk } from '../lib/types';
 
 /** #/board, #/desk/3, #/visitors, #/visitor/<id>, #/register, #/admin */
 export function useRoute(): string[] {
@@ -48,4 +50,23 @@ export function BackLink({ to, children }: { to: string; children: ReactNode }) 
 
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="empty">{children}</p>;
+}
+
+export const CATEGORIES: Category[] = ['public', 'private', 'finance'];
+
+/** 相談先の区分(公的機関等 / 民間協会 / 金融機関)を色つきで示す */
+export function CategoryTag({ category }: { category: Category }) {
+  return <span className={`cat-tag cat-${category}`}>{CATEGORY_LABEL[category]}</span>;
+}
+
+/** 相談中の経過時間。大きく表示し、20分を超えたら赤で強調する */
+export function Elapsed({ startedAt, nowMs }: { startedAt: string | null; nowMs: number }) {
+  const m = minutesBetween(startedAt, nowMs);
+  if (m === null) return null;
+  const over = isOvertime(m);
+  return (
+    <span className={`elapsed ${over ? 'over' : ''}`} title={over ? '相談時間が20分を超えています' : undefined}>
+      <b>{m}</b>分経過{over && <em>20分超</em>}
+    </span>
+  );
 }

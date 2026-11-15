@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ApiError } from '../lib/api';
 import { useStore } from '../lib/store';
-import type { Desk } from '../lib/types';
-import { hhmm } from '../lib/format';
-import { Sheet } from './common';
+import type { Category, Desk } from '../lib/types';
+import { CATEGORY_LABEL, hhmm } from '../lib/format';
+import { CATEGORIES, Sheet } from './common';
 
 const CONFIRM = '全データを削除';
 
@@ -14,6 +14,7 @@ export function Admin() {
     <>
       <h2 className="page-title">管理</h2>
       <h3 className="section">相談先</h3>
+      <p className="hint">表示順は「順」の数字が小さいものから(公的機関等 10〜、民間協会 110〜、金融機関 210〜)。弁護士会・建築士事務所協会のように窓口が複数ある場合は、窓口ごとに相談先を追加してください。</p>
       <ul className="list">{(snap?.desks ?? []).map((d) => <DeskRow key={d.id} d={d} />)}</ul>
       <DeskRow d={null} />
       <Passcodes />
@@ -28,27 +29,27 @@ export function Admin() {
 function DeskRow({ d }: { d: Desk | null }) {
   const { act, call, notify } = useStore();
   const [name, setName] = useState(d?.name ?? '');
-  const [booths, setBooths] = useState(d?.booths ?? 1);
-  const [sort, setSort] = useState(d?.sort ?? 150);
-  const dirty = !d || name !== d.name || booths !== d.booths || sort !== d.sort;
+  const [category, setCategory] = useState<Category>(d?.category ?? 'finance');
+  const [sort, setSort] = useState(d?.sort ?? 310);
+  const dirty = !d || name !== d.name || category !== d.category || sort !== d.sort;
 
   async function save(active: boolean) {
     if (!d) {
       try {
-        await call('upsert_desk', { p_id: null, p_name: name, p_booths: booths, p_active: true, p_sort: sort });
+        await call('upsert_desk', { p_id: null, p_name: name, p_category: category, p_active: true, p_sort: sort });
         notify('相談先を追加しました');
-        setName(''); setBooths(1);
+        setName('');
       } catch (e) { notify(e instanceof ApiError ? e.message : '追加できませんでした', 'error'); }
       return;
     }
-    await act('upsert_desk', { p_id: d.id, p_name: name, p_booths: booths, p_active: active, p_sort: sort }, `相談先「${d.name}」の設定`);
+    await act('upsert_desk', { p_id: d.id, p_name: name, p_category: category, p_active: active, p_sort: sort }, `相談先「${d.name}」の設定`);
   }
 
   return (
-    <li className={`item desk-edit ${d && !d.active ? 'off' : ''}`}>
+    <li className={`item desk-edit cat-bar cat-${category} ${d && !d.active ? 'off' : ''}`}>
       <input aria-label="相談先名" value={name} placeholder={d ? '' : '追加する相談先名'} maxLength={40} onChange={(e) => setName(e.target.value)} />
-      <label className="inline">ブース<select value={booths} onChange={(e) => setBooths(Number(e.target.value))}>
-        {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
+      <label className="inline">区分<select value={category} onChange={(e) => setCategory(e.target.value as Category)}>
+        {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}</select></label>
       <label className="inline">順<input className="narrow" type="number" value={sort} onChange={(e) => setSort(Number(e.target.value))} /></label>
       {d ? (
         <>

@@ -1,4 +1,4 @@
-import type { LeaveKind, TicketStatus } from './types';
+import type { Category, TicketStatus } from './types';
 
 export const pad3 = (no: number) => String(no).padStart(3, '0');
 
@@ -19,21 +19,14 @@ export const TICKET_LABEL: Record<TicketStatus, string> = {
   serving: '相談中',
   done: '相談済み',
   cancelled: '取消',
+  moved: '付け替え',
 };
 
-export const LEAVE_LABEL: Record<LeaveKind, string> = {
-  done: '帰宅(相談完了)',
-  carryover: '帰宅(持ち帰り)',
-  dropped: '帰宅(途中離脱)',
+export const CATEGORY_LABEL: Record<Category, string> = {
+  public: '公的機関等',
+  private: '民間協会',
+  finance: '金融機関',
 };
-
-/** 090-1234-5678 形式に整形(表示用) */
-export function formatPhone(p: string | undefined): string {
-  if (!p) return '';
-  if (p.length === 11) return `${p.slice(0, 3)}-${p.slice(3, 7)}-${p.slice(7)}`;
-  if (p.length === 10) return `${p.slice(0, 2)}-${p.slice(2, 6)}-${p.slice(6)}`;
-  return p;
-}
 
 export function newId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
