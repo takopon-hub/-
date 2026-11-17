@@ -5,6 +5,7 @@ import { useRoute } from './ui/common';
 import { DeskScreen } from './ui/DeskScreen';
 import { Login } from './ui/Login';
 import { Register } from './ui/Register';
+import { ThemeButton } from './ui/ThemeButton';
 import { VisitorScreen } from './ui/VisitorScreen';
 import { Visitors } from './ui/Visitors';
 
@@ -44,8 +45,9 @@ function Main() {
   return (
     <>
       <header className="topbar">
-        <strong>住宅再建 無料相談会</strong>
+        <strong><span>住宅再建</span> <span>無料相談会</span></strong>
         <span className={`role ${op ? 'op' : 'vw'}`}>{op ? '操作者' : '閲覧のみ'}</span>
+        <ThemeButton />
         <button className="btn ghost small" onClick={() => { if (confirm('ログアウトしますか?')) logout(); }}>ログアウト</button>
       </header>
       {!online && (

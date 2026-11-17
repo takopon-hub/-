@@ -225,3 +225,8 @@ legend { font-weight: 700; font-size: 14px; padding: 0; margin-bottom: 6px; }
 .notice-list { margin: 8px 0 12px; padding-left: 20px; line-height: 1.6; }
 .desk.lv1 .chips li.more, .desk.lv2 .chips li.more, .desk.lv3 .chips li.more, .desk.lv4 .chips li.more, .desk.lv5 .chips li.more { background: #e6e9ef; color: #1b2430; }
 .desk.lv1 .count span, .desk.lv2 .count span, .desk.lv3 .count span, .desk.lv4 .count span { color: var(--text); font-weight: 600; }
+.topbar { gap: 6px; padding-left: 12px; padding-right: 12px; }
+.topbar strong { min-width: 0; font-size: 15px; line-height: 1.25; }
+.topbar .btn.small { min-height: 36px; padding: 4px 10px; font-size: 13px; white-space: nowrap; }
+.role { white-space: nowrap; }
+.topbar strong span { display: inline-block; }

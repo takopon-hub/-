@@ -163,6 +163,19 @@ async function login(page, pass) {
   await op.click('button:has-text("戻った")');
   await op.waitForSelector('.badge:has-text("待機中")');
 
+  // --- 閲覧者も、画面上部のボタンで 自動 → ライト → ダーク と切り替えられる
+  const vbg = () => vw.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await vw.emulateMedia({ colorScheme: 'dark' });
+  assert.equal(await vbg(), 'rgb(17, 22, 29)');
+  await vw.click('button.theme-btn');
+  await vw.waitForSelector('button.theme-btn:has-text("ライト")');
+  assert.equal(await vbg(), 'rgb(244, 246, 249)', '閲覧者もライトにできる');
+  await shot(vw, '07c-viewer-light');
+  await vw.click('button.theme-btn');
+  assert.equal(await vbg(), 'rgb(17, 22, 29)');
+  await vw.click('button.theme-btn');
+  await vw.waitForSelector('button.theme-btn:has-text("自動")');
+
   // --- 通信断: オフラインで「帰宅」→ 保存され、復帰後に自動送信される
   await op.click('nav.tabs a:has-text("相談者")');
   await op.click('a.row-btn:has-text("田中")');
