@@ -33,6 +33,8 @@ export interface DeskState {
   desk: Desk;
   waiting: WaitingEntry[];
   serving: Ticket[];
+  /** 離席中(待ち行列から外れている) */
+  away: Ticket[];
   avg: number;
   samples: number;
   /** いま並んだ場合の目安待ち時間(分) */
@@ -61,6 +63,7 @@ export function deskState(desk: Desk, tickets: Ticket[], nowMs: number): DeskSta
     .filter((t) => t.status === 'serving')
     .sort((a, b) => (a.booth ?? 0) - (b.booth ?? 0));
   // 待機順はサーバーが返した並び(queue_at, id 順)をそのまま使う。離席による入れ替えもこの順に反映される。
+  const away = mine.filter((t) => t.status === 'away');
   const waitingTickets = mine.filter((t) => t.status === 'waiting');
 
   const free: number[] = Array.from({ length: Math.max(desk.booths, 1) }, () => 0);
@@ -75,7 +78,7 @@ export function deskState(desk: Desk, tickets: Ticket[], nowMs: number): DeskSta
     free[i] += avg;
     return { ticket, waitMinutes };
   });
-  return { desk, waiting, serving, avg, samples, newArrivalWait: Math.min(...free) };
+  return { desk, waiting, serving, away, avg, samples, newArrivalWait: Math.min(...free) };
 }
 
 export function allDeskStates(desks: Desk[], tickets: Ticket[], nowMs: number): DeskState[] {
@@ -101,7 +104,7 @@ export const isOvertime = (elapsedMinutes: number | null) => elapsedMinutes !== 
 
 export interface VisitorView {
   visitor: Visitor;
-  /** 待機中または相談中の待ち札 */
+  /** 待機中・相談中・離席中の待ち札 */
   current: Ticket | null;
   /** 古い順の全待ち札 */
   history: Ticket[];
@@ -124,7 +127,7 @@ export function visitorViews(visitors: Visitor[], tickets: Ticket[]): VisitorVie
     const history = (byVisitor.get(visitor.id) ?? []).sort(
       (a, b) => ms(a.queuedAt) - ms(b.queuedAt) || a.id.localeCompare(b.id),
     );
-    const current = history.find((t) => t.status === 'waiting' || t.status === 'serving') ?? null;
+    const current = history.find((t) => t.status === 'waiting' || t.status === 'serving' || t.status === 'away') ?? null;
     const consultedDeskIds = [...new Set(history.filter((t) => t.status === 'done').map((t) => t.deskId))];
     const wishesLeft = visitor.status === 'left'
       ? []

@@ -13,7 +13,6 @@ export function Register() {
   const [memo, setMemo] = useState('');
   const [first, setFirst] = useState<number | null>(null);
   const [wishes, setWishes] = useState<number[]>([]);
-  const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
   const [err, setErr] = useState('');
@@ -21,7 +20,7 @@ export function Register() {
   const ids = useRef({ visitor: newId(), ticket: newId() });
 
   const active = deskStates.filter((s) => s.desk.active);
-  const valid = surname.trim().length > 0 && consent && first !== null;
+  const valid = surname.trim().length > 0 && first !== null;
   const toggleWish = (id: number) => setWishes((w) => (w.includes(id) ? w.filter((x) => x !== id) : [...w, id]));
 
   async function submit(e: React.FormEvent) {
@@ -36,7 +35,7 @@ export function Register() {
       });
       setDone({ no: r.no, surname: surname.trim(), deskName: deskStates.find((s) => s.desk.id === first)?.desk.name ?? '' });
       ids.current = { visitor: newId(), ticket: newId() };
-      setSurname(''); setMemo(''); setFirst(null); setWishes([]); setConsent(false);
+      setSurname(''); setMemo(''); setFirst(null); setWishes([]);
     } catch (e2) {
       if (e2 instanceof NetworkError) setErr('通信できませんでした。電波を確認して、もう一度「受付する」を押してください(二重に登録されることはありません)。');
       else if (e2 instanceof ApiError) setErr(e2.message);
@@ -100,10 +99,6 @@ export function Register() {
       <label htmlFor="memo">メモ(任意・60文字まで。相談内容など詳しい事情は書かないでください)</label>
       <input id="memo" value={memo} maxLength={60} autoComplete="off" onChange={(e) => setMemo(e.target.value)} />
 
-      <label className="check">
-        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-        <span>個人情報の取り扱い(パンフレット記載)を口頭で説明し、同意を得た。苗字と受付番号は相談先の職員にも共有されます。</span>
-      </label>
       {err && <p className="error" role="alert">{err}</p>}
       <button className="btn primary block" disabled={!valid || busy}>{busy ? '登録中…' : '受付する'}</button>
       {first !== null && <p className="hint center"><CategoryTag category={active.find((s) => s.desk.id === first)?.desk.category ?? 'finance'} /> を最初の相談先として登録します</p>}

@@ -16,6 +16,7 @@ export function minutesBetween(a: string | null, b: string | number | null): num
 
 export const TICKET_LABEL: Record<TicketStatus, string> = {
   waiting: '待機中',
+  away: '離席中',
   serving: '相談中',
   done: '相談済み',
   cancelled: '取消',

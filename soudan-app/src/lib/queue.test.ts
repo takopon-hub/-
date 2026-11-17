@@ -138,3 +138,17 @@ describe('readyDesks(ご案内待ち)', () => {
     expect(readyDesks(states).map((s) => s.desk.id)).toEqual([1]);
   });
 });
+
+describe('離席(away)', () => {
+  it('待ち行列と待ち時間の計算に入らず、離席中として分けて返す', () => {
+    const s = deskState(desk(1), [tk({ deskId: 1, status: 'away' }), tk({ deskId: 1, status: 'waiting' })], T0);
+    expect(s.waiting).toHaveLength(1);
+    expect(s.away).toHaveLength(1);
+  });
+  it('離席中の人は「行き先未決定」にならず、現在の待ち札は離席中', () => {
+    const v: Visitor = { id: 'v1', no: 1, surname: '山田', status: 'in', wishes: [], createdAt: at(0) } as Visitor;
+    const [view] = visitorViews([v], [tk({ deskId: 1, status: 'away', visitorId: 'v1' })]);
+    expect(view.idle).toBe(false);
+    expect(view.current?.status).toBe('away');
+  });
+});

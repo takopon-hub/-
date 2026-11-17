@@ -3,6 +3,7 @@ import { useStore } from '../lib/store';
 import { TICKET_LABEL, hhmm, minutesBetween, pad3 } from '../lib/format';
 import { BackLink, Badge, Elapsed, Empty, useDeskMap } from './common';
 import { NextSheet } from './NextSheet';
+import { AwaySheet } from './Away';
 import { whereLabel } from './Visitors';
 
 export function VisitorScreen({ id }: { id: string }) {
@@ -10,6 +11,7 @@ export function VisitorScreen({ id }: { id: string }) {
   const desks = useDeskMap();
   const [sheet, setSheet] = useState(false);
   const [move, setMove] = useState(false);
+  const [away, setAway] = useState(false);
   const [edit, setEdit] = useState(false);
   const view = views.find((v) => v.visitor.id === id);
   if (!view) return <><BackLink to="visitors">相談者</BackLink><Empty>相談者が見つかりません</Empty></>;
@@ -57,7 +59,14 @@ export function VisitorScreen({ id }: { id: string }) {
             {idle && <button className="btn primary" onClick={() => setSheet(true)}>次の行き先を決める</button>}
             {current?.status === 'waiting' && (
               <>
+                <button className="btn" onClick={() => setAway(true)}>昼食などで離席(待ちから外れる)</button>
                 <button className="btn" onClick={() => setMove(true)}>別の相談先へ付け替え</button>
+                <button className="btn" onClick={() => act('cancel_ticket', { p_ticket_id: current.id }, '待ち取消')}>待ちを取り消す</button>
+              </>
+            )}
+            {current?.status === 'away' && (
+              <>
+                <button className="btn primary" onClick={() => act('resume_ticket', { p_ticket_id: current.id }, `${label} 離席から戻る`)}>戻った(最後尾に並び直す)</button>
                 <button className="btn" onClick={() => act('cancel_ticket', { p_ticket_id: current.id }, '待ち取消')}>待ちを取り消す</button>
               </>
             )}
@@ -91,7 +100,7 @@ export function VisitorScreen({ id }: { id: string }) {
         {history.map((t) => (
           <li key={t.id} className={t.status}>
             <strong>{deskName(t.deskId)}</strong>{' '}
-            <Badge kind={t.status === 'serving' ? 'serve' : t.status === 'waiting' ? 'wait' : t.status === 'done' ? 'done' : 'off'}>{TICKET_LABEL[t.status]}</Badge>
+            <Badge kind={t.status === 'serving' ? 'serve' : t.status === 'waiting' ? 'wait' : t.status === 'away' ? 'warn' : t.status === 'done' ? 'done' : 'off'}>{TICKET_LABEL[t.status]}</Badge>
             <small>
               並んだ時刻 {hhmm(t.queuedAt)}
               {t.startedAt && ` / 開始 ${hhmm(t.startedAt)}`}
@@ -103,6 +112,7 @@ export function VisitorScreen({ id }: { id: string }) {
         {visitor.status === 'left' && <li className="done"><strong>帰宅</strong></li>}
       </ol>
       {sheet && <NextSheet visitorId={id} onClose={() => setSheet(false)} />}
+      {away && current?.status === 'waiting' && <AwaySheet ticketId={current.id} visitorId={id} deskName={deskName(current.deskId)} onClose={() => setAway(false)} />}
       {move && current && <NextSheet visitorId={id} moveTicketId={current.id} fromDeskId={current.deskId} onClose={() => setMove(false)} />}
     </>
   );

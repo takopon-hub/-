@@ -201,3 +201,11 @@ legend { font-weight: 700; font-size: 14px; padding: 0; margin-bottom: 6px; }
 .guide-text b { font-size: 18px; }
 .guide-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .card.desk.ready { outline: 2px solid var(--danger); }
+
+/* 待ち人数の数字: 0以外は色付き(カードの背景の段階に合わせる) */
+.count b.nz { display: inline-block; min-width: 1.5em; text-align: center; padding: 2px 8px; border-radius: 10px; color: #fff; background: #b7791f; }
+.desk.lv2 .count b.nz { background: #d9622b; } .desk.lv3 .count b.nz { background: #cf3f2e; }
+.desk.lv4 .count b.nz { background: #b42318; } .desk.lv5 .count b.nz { background: #fff; color: #b42318; }
+.away-note { margin: 2px 0; font-size: 13px; font-weight: 700; color: var(--warn); }
+.summary { margin-top: 12px; }
+.notice-list { margin: 8px 0 12px; padding-left: 20px; line-height: 1.6; }

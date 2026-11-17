@@ -8,7 +8,7 @@ type Filter = 'all' | 'in' | 'idle' | 'left';
 
 export function whereLabel(v: VisitorView, deskName: (id: number) => string): { kind: 'wait' | 'serve' | 'done' | 'warn'; text: string } {
   if (v.visitor.status === 'left') return { kind: 'done', text: '帰宅' };
-  if (v.current) return { kind: v.current.status === 'serving' ? 'serve' : 'wait', text: `${deskName(v.current.deskId)} ${TICKET_LABEL[v.current.status]}` };
+  if (v.current) return { kind: v.current.status === 'serving' ? 'serve' : v.current.status === 'away' ? 'warn' : 'wait', text: `${deskName(v.current.deskId)} ${TICKET_LABEL[v.current.status]}` };
   return { kind: 'warn', text: '次の行き先が未決定' };
 }
 

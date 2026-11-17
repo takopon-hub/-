@@ -1,5 +1,5 @@
 export type Role = 'operator' | 'viewer';
-export type TicketStatus = 'waiting' | 'serving' | 'done' | 'cancelled' | 'moved';
+export type TicketStatus = 'waiting' | 'serving' | 'done' | 'cancelled' | 'moved' | 'away';
 /** public=公的機関等 / private=民間協会 / finance=金融機関 */
 export type Category = 'public' | 'private' | 'finance';
 

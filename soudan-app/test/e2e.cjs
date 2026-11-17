@@ -52,8 +52,7 @@ async function login(page, pass) {
     await op.fill('#surname', surname);
     await op.click(`label.radio:has-text("${firstDesk}")`);
     for (const w of wishDesks) await op.click(`button.chip:text-is("${w}")`);
-    assert.equal(await op.locator('button:has-text("受付する")').isDisabled(), true, '同意前は受付できない');
-    await op.check('.check input');
+    assert.equal(await op.locator('.check').count(), 0, '同意チェックはない');
     await op.click('button:has-text("受付する")');
     await op.waitForSelector('.big-no');
     return (await op.locator('.big-no').innerText()).trim();
@@ -88,6 +87,12 @@ async function login(page, pass) {
   assert.match(await op.locator('.guide-box').innerText(), /肥後銀行 が空いています/);
   assert.match(await cls('肥後銀行'), /\bready\b/);
   await shot(op, '02b-board-guide');
+
+  assert.match(await cls('熊本弁護士会①'), /lv1/);
+  assert.equal(await op.locator('article.desk:has(h3:text-is("熊本弁護士会①")) .count b.nz').count(), 1, '待ちありの数字は色付き');
+  assert.equal(await op.locator('article.desk:has(h3:text-is("熊本弁護士会②")) .count b.nz').count(), 0, '0人は色なし');
+  const tops = await op.evaluate(() => [document.querySelector('.summary').getBoundingClientRect().top, document.querySelector('article.desk').getBoundingClientRect().top]);
+  assert.ok(tops[0] > tops[1], '受付累計などの数表示はボードの下にある');
 
   // --- 相談先画面: 先頭の山田が不在 → 次の佐藤と入れ替え
   await op.click('article.desk:has(h3:text-is("肥後銀行")) h3');
@@ -146,6 +151,17 @@ async function login(page, pass) {
   const vwText = await vw.locator('main').innerText();
   assert.ok(vwText.includes('熊本銀行') && !/携帯|電話/.test(vwText), '閲覧者に電話・携帯の表示がない');
   await shot(vw, '07-visitor-viewer');
+
+  // --- 離席: 相談者画面から、説明・了承つきで待ち行列から外れる → 戻ると最後尾
+  await op.click('nav.tabs a:has-text("相談者")');
+  await op.click('a.row-btn:has-text("高橋")');
+  await op.click('button:has-text("昼食などで離席")');
+  await op.waitForSelector('[role=dialog]:has-text("先にご案内することがあります")');
+  await shot(op, '07b-away-sheet');
+  await op.click('[role=dialog] button:has-text("離席にする")');
+  await op.waitForSelector('.badge:has-text("離席中")');
+  await op.click('button:has-text("戻った")');
+  await op.waitForSelector('.badge:has-text("待機中")');
 
   // --- 通信断: オフラインで「帰宅」→ 保存され、復帰後に自動送信される
   await op.click('nav.tabs a:has-text("相談者")');

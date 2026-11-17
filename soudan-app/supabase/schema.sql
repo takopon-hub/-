@@ -24,7 +24,7 @@ begin
     select p.oid::regprocedure as f from pg_proc p
     where p.pronamespace = 'public'::regnamespace
       and p.proname in ('snapshot', 'get_log', 'register_visitor', 'update_visitor', 'enqueue', 'start_ticket',
-                        'finish_ticket', 'cancel_ticket', 'revert_ticket', 'swap_tickets', 'move_ticket',
+                        'finish_ticket', 'cancel_ticket', 'revert_ticket', 'swap_tickets', 'move_ticket', 'away_ticket', 'resume_ticket',
                         'leave_visitor', 'reopen_visitor', 'upsert_desk', 'set_passcodes', 'purge_all')
   loop
     execute 'drop function ' || r.f;
@@ -69,7 +69,7 @@ create table if not exists app.ticket (
   id         uuid primary key,
   visitor_id uuid not null references app.visitor (id) on delete cascade,
   desk_id    int  not null references app.desk (id),
-  status     text not null default 'waiting' check (status in ('waiting', 'serving', 'done', 'cancelled', 'moved')),
+  status     text not null default 'waiting' check (status in ('waiting', 'serving', 'done', 'cancelled', 'moved', 'away')),
   booth      int,
   queued_at  timestamptz not null default now(),
   queue_at   timestamptz not null default now(),
@@ -77,8 +77,13 @@ create table if not exists app.ticket (
   ended_at   timestamptz
 );
 -- 相談者は同時に1つの待ち札しか持てない(待機中または相談中)
-create unique index if not exists ticket_one_active_per_visitor
-  on app.ticket (visitor_id) where status in ('waiting', 'serving');
+-- 離席(away)を追加した版への切り替え: 既存テーブルの制約と索引を作り直す(データは消えない)
+alter table app.ticket drop constraint if exists ticket_status_check;
+alter table app.ticket add constraint ticket_status_check
+  check (status in ('waiting', 'serving', 'done', 'cancelled', 'moved', 'away'));
+drop index if exists app.ticket_one_active_per_visitor;
+create unique index ticket_one_active_per_visitor
+  on app.ticket (visitor_id) where status in ('waiting', 'serving', 'away');
 -- 同じブースで同時に2人を相談中にできない
 create unique index if not exists ticket_one_serving_per_booth
   on app.ticket (desk_id, booth) where status = 'serving';
@@ -257,7 +262,7 @@ begin
   if not exists (select 1 from app.desk where id = p_desk_id and active) then
     raise exception 'E_DESK_CLOSED: その相談先は休止中です';
   end if;
-  if exists (select 1 from app.ticket where visitor_id = p_visitor_id and status in ('waiting', 'serving')) then
+  if exists (select 1 from app.ticket where visitor_id = p_visitor_id and status in ('waiting', 'serving', 'away')) then
     raise exception 'E_ALREADY_ACTIVE: すでに別の相談先に並んでいるか相談中です';
   end if;
   insert into app.ticket (id, visitor_id, desk_id) values (p_ticket_id, p_visitor_id, p_desk_id);
@@ -369,6 +374,35 @@ begin
   return jsonb_build_object('ok', true, 'already', false);
 end $$;
 
+-- 昼食などで待ち行列から外れる(離席)。離席中は案内の対象にならず、戻ったら同じ相談先の最後尾に並び直す。
+create or replace function public.away_ticket(p_pass text, p_ticket_id uuid) returns jsonb
+language plpgsql security definer set search_path = app, public as $$
+declare t app.ticket;
+begin
+  perform app.require_operator(p_pass);
+  select * into t from app.ticket where id = p_ticket_id for update;
+  if not found then raise exception 'E_NOT_FOUND: 待ち札が見つかりません'; end if;
+  if t.status = 'away' then return jsonb_build_object('ok', true, 'already', true); end if;
+  if t.status <> 'waiting' then raise exception 'E_BAD_STATE: 待機中ではないため離席にできません(状況が変わりました)'; end if;
+  update app.ticket set status = 'away' where id = p_ticket_id;
+  perform app.log('離席', app.visitor_no(t.visitor_id) || ' desk ' || t.desk_id);
+  return jsonb_build_object('ok', true, 'already', false);
+end $$;
+
+create or replace function public.resume_ticket(p_pass text, p_ticket_id uuid) returns jsonb
+language plpgsql security definer set search_path = app, public as $$
+declare t app.ticket;
+begin
+  perform app.require_operator(p_pass);
+  select * into t from app.ticket where id = p_ticket_id for update;
+  if not found then raise exception 'E_NOT_FOUND: 待ち札が見つかりません'; end if;
+  if t.status = 'waiting' then return jsonb_build_object('ok', true, 'already', true); end if;
+  if t.status <> 'away' then raise exception 'E_BAD_STATE: 離席中ではありません(状況が変わりました)'; end if;
+  update app.ticket set status = 'waiting', queue_at = clock_timestamp() where id = p_ticket_id;
+  perform app.log('離席から戻る', app.visitor_no(t.visitor_id) || ' desk ' || t.desk_id);
+  return jsonb_build_object('ok', true, 'already', false);
+end $$;
+
 -- 直前の操作の取り消し: 終了→相談中 / 相談中→待機中 / 取消→待機中
 create or replace function public.revert_ticket(p_pass text, p_ticket_id uuid) returns jsonb
 language plpgsql security definer set search_path = app, public as $$
@@ -379,8 +413,8 @@ begin
   if not found then raise exception 'E_NOT_FOUND: 待ち札が見つかりません'; end if;
   select * into v from app.visitor where id = t.visitor_id for update;
   if v.status <> 'in' then raise exception 'E_VISITOR_LEFT: 帰宅済みです。先に「帰宅を取り消す」を行ってください'; end if;
-  if t.status in ('waiting', 'moved') then raise exception 'E_BAD_STATE: 戻せる操作がありません'; end if;
-  if exists (select 1 from app.ticket where visitor_id = t.visitor_id and status in ('waiting', 'serving') and id <> t.id) then
+  if t.status in ('waiting', 'moved', 'away') then raise exception 'E_BAD_STATE: 戻せる操作がありません'; end if;
+  if exists (select 1 from app.ticket where visitor_id = t.visitor_id and status in ('waiting', 'serving', 'away') and id <> t.id) then
     raise exception 'E_ALREADY_ACTIVE: すでに別の相談先に並んでいるか相談中です';
   end if;
   if t.status = 'serving' then
@@ -416,7 +450,7 @@ begin
   if exists (select 1 from app.ticket where visitor_id = v.id and status = 'serving') then
     raise exception 'E_SERVING: 相談中です。先に相談を終了してください';
   end if;
-  update app.ticket set status = 'cancelled', ended_at = now() where visitor_id = v.id and status = 'waiting';
+  update app.ticket set status = 'cancelled', ended_at = now() where visitor_id = v.id and status in ('waiting', 'away');
   update app.visitor set status = 'left' where id = v.id;
   perform app.log('帰宅', lpad(v.no::text, 3, '0'));
   return jsonb_build_object('ok', true, 'already', false);

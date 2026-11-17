@@ -30,15 +30,6 @@ export function Board() {
 
   return (
     <>
-      <section className="summary" aria-label="会場の状況">
-        <div><b>{inside}</b><span>会場内</span></div>
-        <div><b>{left}</b><span>帰宅</span></div>
-        <div><b>{views.length}</b><span>受付累計</span></div>
-        {idle > 0 && (
-          <a href="#/visitors/idle" className="warn-link"><b>{idle}</b><span>行き先未決定</span></a>
-        )}
-      </section>
-
       {ready.length > 0 && (
         <section className="guide-box" aria-label="ご案内待ち">
           <h2 className="guide-title">⚠ ご案内待ち {ready.length}件(ブースが空いています)</h2>
@@ -65,6 +56,14 @@ export function Board() {
           </section>
         );
       })}
+      <section className="summary" aria-label="会場の状況">
+        <div><b>{inside}</b><span>会場内</span></div>
+        <div><b>{left}</b><span>帰宅</span></div>
+        <div><b>{views.length}</b><span>受付累計</span></div>
+        {idle > 0 && (
+          <a href="#/visitors/idle" className="warn-link"><b>{idle}</b><span>行き先未決定</span></a>
+        )}
+      </section>
       <p className="hint center">★を押すと、自分の相談先を先頭に固定できます(この端末だけの設定)。</p>
     </>
   );
@@ -99,9 +98,10 @@ function DeskCard({ s, nowMs, mine, onStar }: { s: DeskState; nowMs: number; min
       </header>
       <div className="desk-body" onClick={() => go(`desk/${s.desk.id}`)}>
         <div className="count">
-          <b>{n}</b><span>人待ち</span>
+          <b className={n > 0 ? 'nz' : ''}>{n}</b><span>人待ち</span>
           <em>{n === 0 && s.serving.length < s.desk.booths ? 'すぐご案内' : `目安 ${waitLabel(s.newArrivalWait)}`}</em>
         </div>
+        {s.away.length > 0 && <p className="away-note">離席中 {s.away.length}人</p>}
         <ul className="serving">
           {s.serving.map((t) => {
             const v = vname(t.visitorId);

@@ -87,6 +87,22 @@ export function DeskScreen({ id }: { id: number }) {
           );
         })}
       </ol>
+      {s.away.length > 0 && (
+        <>
+          <h3 className="section">離席中 ({s.away.length}人)</h3>
+          <ul className="list">
+            {s.away.map((t) => {
+              const v = visitor(t.visitorId);
+              return (
+                <li key={t.id} className="item">
+                  <a className="grow name" href={`#/visitor/${t.visitorId}`}>{v ? `${pad3(v.no)} ${v.surname}さん` : ''}</a>
+                  {op && <button className="btn" onClick={() => act('resume_ticket', { p_ticket_id: t.id }, '離席から戻る')}>戻った(最後尾へ)</button>}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
       {op && s.waiting.length > 0 && (
         <p className="hint">
           呼び出しても不在(食事など)の方は「不在 → 次の人と入替」で、次の方を先に案内できます。
