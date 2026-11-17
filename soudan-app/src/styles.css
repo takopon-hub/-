@@ -162,8 +162,8 @@ legend { font-weight: 700; font-size: 14px; padding: 0; margin-bottom: 6px; }
 .desk.lv1 { background: var(--lv1); } .desk.lv2 { background: var(--lv2); } .desk.lv3 { background: var(--lv3); }
 .desk.lv4 { background: var(--lv4); } .desk.lv5 { background: var(--lv5); color: #fff; }
 .desk.lv5 small, .desk.lv5 .count span, .desk.lv5 .count em { color: #fff; }
-.desk.lv5 .chips li { background: rgba(255,255,255,.9); color: #8c1d18; }
-.desk.lv1 .chips li, .desk.lv2 .chips li, .desk.lv3 .chips li, .desk.lv4 .chips li { background: rgba(255,255,255,.75); color: var(--text); }
+.desk.lv5 .chips li { background: #fff; color: #8c1d18; }
+.desk.lv1 .chips li, .desk.lv2 .chips li, .desk.lv3 .chips li, .desk.lv4 .chips li { background: #fff; color: #1b2430; }   /* ダークモードでも白地に濃い文字(白抜きで読めなくなるのを防ぐ) */
 .count b { font-size: 40px; }
 .count b.hot { color: inherit; }
 .legend { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 4px; font-size: 12px; font-weight: 700; }
@@ -209,3 +209,5 @@ legend { font-weight: 700; font-size: 14px; padding: 0; margin-bottom: 6px; }
 .away-note { margin: 2px 0; font-size: 13px; font-weight: 700; color: var(--warn); }
 .summary { margin-top: 12px; }
 .notice-list { margin: 8px 0 12px; padding-left: 20px; line-height: 1.6; }
+.desk.lv1 .chips li.more, .desk.lv2 .chips li.more, .desk.lv3 .chips li.more, .desk.lv4 .chips li.more, .desk.lv5 .chips li.more { background: #e6e9ef; color: #1b2430; }
+.desk.lv1 .count span, .desk.lv2 .count span, .desk.lv3 .count span, .desk.lv4 .count span { color: var(--text); font-weight: 600; }
