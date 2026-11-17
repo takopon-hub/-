@@ -83,6 +83,12 @@ async function login(page, pass) {
   await vw.waitForSelector('article.desk.lv5:has(h3:text-is("肥後銀行"))', { timeout: 8000 });
   await shot(vw, '02-board-viewer');
 
+  // --- ボード先頭の注意表示: 空いているブースに待ちがいる相談先が並ぶ
+  await op.waitForSelector('.guide-box');
+  assert.match(await op.locator('.guide-box').innerText(), /肥後銀行 が空いています/);
+  assert.match(await cls('肥後銀行'), /\bready\b/);
+  await shot(op, '02b-board-guide');
+
   // --- 相談先画面: 先頭の山田が不在 → 次の佐藤と入れ替え
   await op.click('article.desk:has(h3:text-is("肥後銀行")) h3');
   await op.waitForSelector('ol.numbered li');
@@ -117,9 +123,11 @@ async function login(page, pass) {
   assert.equal(await op.locator('[role=dialog] h3:has-text("受付時に希望していた")').count(), 0);
   await op.click('[role=dialog] button.row-btn:has-text("熊本弁護士会①")');
 
-  // --- 山田を開始 → 終了 → 希望先(熊本銀行・弁護士会①)が上に出る
-  await op.waitForSelector('ol.numbered li:has-text("001 山田")');
-  await op.locator('ol.numbered li', { hasText: '001 山田' }).locator('button:has-text("開始")').first().click();
+  // --- 一連の流れ: 行き先を決めたあと、続けて次の人(山田)の案内シートが出る → そこから開始
+  await op.waitForSelector('[role=dialog]:has-text("続けて、次の方をご案内")');
+  assert.match(await op.locator('[role=dialog]').innerText(), /001 山田さん/);
+  await shot(op, '05b-guide-sheet');
+  await op.click('[role=dialog] button:has-text("案内して開始")');
   await op.waitForSelector('ul.list li:has-text("001 山田")');
   await op.click('button:has-text("終了")');
   await op.waitForSelector('[role=dialog] h3:has-text("受付時に希望していた")');
@@ -128,6 +136,7 @@ async function login(page, pass) {
   assert.equal(await op.locator('[role=dialog] .badge:has-text("希望")').count(), 2);
   await shot(op, '06-next-sheet');
   await op.click('[role=dialog] button.row-btn:has-text("熊本銀行")');
+  await op.click('[role=dialog] button:has-text("あとで")');
 
   // --- 閲覧者: メモ・操作ボタンなし、希望先は見える
   await vw.click('nav.tabs a:has-text("相談者")');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { avgMinutes, deskState, isOvertime, roundWait, visitorViews, waitLabel, waitLevel } from './queue';
+import { allDeskStates, readyDesks, avgMinutes, deskState, isOvertime, roundWait, visitorViews, waitLabel, waitLevel } from './queue';
 import type { Desk, Ticket, Visitor } from './types';
 
 const T0 = Date.parse('2026-12-05T10:00:00Z');
@@ -125,5 +125,16 @@ describe('visitorViews', () => {
     const [a, , c] = visitorViews([v('a'), v('b'), v('c', 'left')], [t1, t2]);
     expect(a.wishesLeft).toEqual([3]);
     expect(c.wishesLeft).toEqual([]);   // 帰宅済みは対象外
+  });
+});
+
+describe('readyDesks(ご案内待ち)', () => {
+  it('ブースが空いていて待ちがいる相談先だけを返す', () => {
+    const states = allDeskStates([desk(1), desk(2), desk(3)], [
+      tk({ deskId: 1, status: 'waiting' }),
+      tk({ deskId: 2, status: 'serving', startedAt: at(1), booth: 1 }),
+      tk({ deskId: 2, status: 'waiting' }),
+    ], T0 + 5 * 60000);
+    expect(readyDesks(states).map((s) => s.desk.id)).toEqual([1]);
   });
 });

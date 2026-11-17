@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useStore, storage } from '../lib/store';
-import { waitLabel, waitLevel, type DeskState } from '../lib/queue';
+import { readyDesks, waitLabel, waitLevel, type DeskState } from '../lib/queue';
 import { CATEGORY_LABEL, pad3 } from '../lib/format';
+import { GuideCard } from './Guide';
 import { Badge, CATEGORIES, CategoryTag, Elapsed, go } from './common';
 
 const MY_KEY = 'soudan.myDesk';
@@ -21,6 +22,7 @@ export function Board() {
   const inside = views.filter((v) => v.visitor.status === 'in').length;
   const left = views.length - inside;
   const idle = views.filter((v) => v.idle).length;
+  const ready = readyDesks(deskStates);
   const pinned = deskStates.find((s) => s.desk.id === mine);
   const card = (s: DeskState) => (
     <DeskCard key={s.desk.id} s={s} nowMs={nowMs} mine={s.desk.id === mine} onStar={() => toggle(s.desk.id)} />
@@ -36,6 +38,13 @@ export function Board() {
           <a href="#/visitors/idle" className="warn-link"><b>{idle}</b><span>行き先未決定</span></a>
         )}
       </section>
+
+      {ready.length > 0 && (
+        <section className="guide-box" aria-label="ご案内待ち">
+          <h2 className="guide-title">⚠ ご案内待ち {ready.length}件(ブースが空いています)</h2>
+          {ready.map((s) => <GuideCard key={s.desk.id} s={s} link />)}
+        </section>
+      )}
 
       <Legend />
 
@@ -75,12 +84,13 @@ function Legend() {
 }
 
 function DeskCard({ s, nowMs, mine, onStar }: { s: DeskState; nowMs: number; mine: boolean; onStar(): void }) {
+  const ready = s.desk.active && s.waiting.length > 0 && s.serving.length < s.desk.booths;
   const { snap } = useStore();
   const vname = (id: string) => snap?.visitors.find((v) => v.id === id);
   const n = s.waiting.length;
   const lv = waitLevel(n);
   return (
-    <article className={`card desk lv${lv} cat-bar cat-${s.desk.category} ${s.desk.active ? '' : 'off'} ${mine ? 'mine' : ''}`}>
+    <article className={`card desk lv${lv} ${ready ? 'ready' : ''} cat-bar cat-${s.desk.category} ${s.desk.active ? '' : 'off'} ${mine ? 'mine' : ''}`}>
       <header>
         <button className="star" aria-pressed={mine} aria-label={`${s.desk.name}を先頭に固定`} onClick={onStar}>{mine ? '★' : '☆'}</button>
         <h3 onClick={() => go(`desk/${s.desk.id}`)}>{s.desk.name}</h3>

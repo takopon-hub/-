@@ -9,13 +9,15 @@ interface Props {
   /** 指定すると「付け替え」モード: 待機中のこの待ち札を、選んだ相談先の最後尾へ移す */
   moveTicketId?: string;
   fromDeskId?: number;
+  /** 行き先が決まったとき(相談先名 / 帰宅)に呼ばれる */
+  onChosen?: (text: string) => void;
 }
 
 /**
  * 「次の行き先」を決める(相談しながら決まっていくので、希望先は目安として上に出すだけで、どこにでも並べる)。
  * moveTicketId を渡すと、待ちの途中で別の相談先へ付け替える画面になる。
  */
-export function NextSheet({ visitorId, onClose, moveTicketId, fromDeskId }: Props) {
+export function NextSheet({ visitorId, onClose, moveTicketId, fromDeskId, onChosen }: Props) {
   const { views, deskStates, act } = useStore();
   const view = views.find((v) => v.visitor.id === visitorId);
   if (!view) return null;
@@ -24,6 +26,7 @@ export function NextSheet({ visitorId, onClose, moveTicketId, fromDeskId }: Prop
   const label = `${pad3(visitor.no)} ${visitor.surname}`;
 
   async function choose(deskId: number) {
+    onChosen?.(`${deskStates.find((d) => d.desk.id === deskId)?.desk.name ?? ''}へ`);
     onClose();
     if (moveTicketId) {
       await act('move_ticket', { p_ticket_id: moveTicketId, p_new_ticket_id: newId(), p_desk_id: deskId }, `${label} を付け替え`);
@@ -32,6 +35,7 @@ export function NextSheet({ visitorId, onClose, moveTicketId, fromDeskId }: Prop
     }
   }
   async function leave() {
+    onChosen?.('帰宅');
     onClose();
     await act('leave_visitor', { p_visitor_id: visitorId }, `${label} 帰宅`);
   }

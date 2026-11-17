@@ -192,3 +192,12 @@ legend { font-weight: 700; font-size: 14px; padding: 0; margin-bottom: 6px; }
 .form label.radio { display: flex; align-items: center; gap: 10px; }
 .form label.radio .grow { font-weight: 700; }
 .form label.radio > span:last-child { font-size: 13px; color: var(--sub); white-space: nowrap; }
+
+/* ご案内待ち(ブースが空いていて待ちがいる)の注意表示 */
+.guide-box { margin: 0 0 12px; }
+.guide-title { font-size: 15px; margin: 4px 0 8px; color: var(--danger); }
+.guide { border: 2px solid var(--danger); background: var(--wait-bg); border-radius: 12px; padding: 10px 12px; margin: 0 0 8px; }
+.guide-text { font-size: 15px; line-height: 1.5; }
+.guide-text b { font-size: 18px; }
+.guide-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.card.desk.ready { outline: 2px solid var(--danger); }

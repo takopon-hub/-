@@ -82,6 +82,11 @@ export function allDeskStates(desks: Desk[], tickets: Ticket[], nowMs: number): 
   return desks.map((d) => deskState(d, tickets, nowMs));
 }
 
+/** ご案内待ち: ブースが空いているのに、待っている人がいる相談先(案内担当が動くべき相談先) */
+export function readyDesks(states: DeskState[]): DeskState[] {
+  return states.filter((s) => s.desk.active && s.waiting.length > 0 && s.serving.length < s.desk.booths);
+}
+
 /** ボードの色分け用の段階。0=待ちなし 1=薄黄(1人) 2〜4=薄赤→濃い赤(2〜4人) 5=赤(5人以上) */
 export function waitLevel(waitingCount: number): 0 | 1 | 2 | 3 | 4 | 5 {
   if (waitingCount <= 0) return 0;

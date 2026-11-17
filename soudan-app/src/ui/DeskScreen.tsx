@@ -4,10 +4,14 @@ import { waitLabel } from '../lib/queue';
 import { pad3 } from '../lib/format';
 import { BackLink, Badge, CategoryTag, Elapsed, Empty } from './common';
 import { NextSheet } from './NextSheet';
+import { GuideCard } from './Guide';
+import { Sheet } from './common';
 
 export function DeskScreen({ id }: { id: number }) {
   const { deskStates, snap, role, act, nowMs } = useStore();
   const [next, setNext] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [guide, setGuide] = useState<string | null>(null);   // 終了→次の行き先→次の人の案内、を一連で進める
   const [move, setMove] = useState<{ ticketId: string; visitorId: string } | null>(null);
   const s = deskStates.find((d) => d.desk.id === id);
   if (!s || !snap) return <><BackLink to="">ボード</BackLink><Empty>相談先が見つかりません</Empty></>;
@@ -17,7 +21,7 @@ export function DeskScreen({ id }: { id: number }) {
 
   async function finish(ticketId: string, visitorId: string) {
     const r = await act('finish_ticket', { p_ticket_id: ticketId }, '相談終了');
-    if (r !== false) setNext(visitorId);
+    if (r !== false) { setSentTo(null); setGuide(null); setNext(visitorId); }
   }
 
   return (
@@ -28,6 +32,8 @@ export function DeskScreen({ id }: { id: number }) {
         平均相談時間 約{Math.round(s.avg)}分
         {s.samples >= 3 ? `(実績${s.samples}件)` : '(実績が少ないため初期値)'}
       </p>
+
+      {op && s.desk.active && s.waiting.length > 0 && s.serving.length < s.desk.booths && <GuideCard s={s} />}
 
       <h3 className="section">相談中</h3>
       {s.serving.length === 0 && <Empty>相談中の方はいません</Empty>}
@@ -87,7 +93,17 @@ export function DeskScreen({ id }: { id: number }) {
           行列の動きが悪いときは「別の相談先へ付け替え」で新しい行列の最後尾に移せます。
         </p>
       )}
-      {next && <NextSheet visitorId={next} onClose={() => setNext(null)} />}
+      {next && (
+        <NextSheet visitorId={next} onChosen={setSentTo}
+          onClose={() => { setGuide(next); setNext(null); }} />
+      )}
+      {guide !== null && !next && s.waiting.length > 0 && !busy && (
+        <Sheet title="続けて、次の方をご案内" onClose={() => setGuide(null)}>
+          {visitor(guide) && <p className="hint">{pad3(visitor(guide)!.no)} {visitor(guide)!.surname}さん{sentTo ? ` → ${sentTo}` : ''}(記録しました)</p>}
+          <GuideCard s={s} />
+          <div className="actions"><button className="btn ghost" onClick={() => setGuide(null)}>あとで</button></div>
+        </Sheet>
+      )}
       {move && <NextSheet visitorId={move.visitorId} moveTicketId={move.ticketId} fromDeskId={id} onClose={() => setMove(null)} />}
     </>
   );
