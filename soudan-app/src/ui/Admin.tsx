@@ -4,7 +4,6 @@ import { useStore } from '../lib/store';
 import type { Category, Desk } from '../lib/types';
 import { CATEGORY_LABEL, hhmm } from '../lib/format';
 import { CATEGORIES, Sheet } from './common';
-import { getTheme, setTheme, type Theme } from '../lib/theme';
 
 const CONFIRM = '全データを削除';
 
@@ -14,7 +13,6 @@ export function Admin() {
   return (
     <>
       <h2 className="page-title">管理</h2>
-      <ThemePicker />
       <h3 className="section">相談先</h3>
       <p className="hint">表示順は「順」の数字が小さいものから(公的機関等 10〜、民間協会 110〜、金融機関 210〜)。弁護士会・建築士事務所協会のように窓口が複数ある場合は、窓口ごとに相談先を追加してください。</p>
       <ul className="list">{(snap?.desks ?? []).map((d) => <DeskRow key={d.id} d={d} />)}</ul>
@@ -131,27 +129,5 @@ function LogSheet({ onClose }: { onClose(): void }) {
       {!rows && !err && <p>読み込み中…</p>}
       <ul className="log">{rows?.map((r, i) => <li key={i}><time>{hhmm(r.at)}</time> {r.action} <small>{r.detail}</small></li>)}</ul>
     </Sheet>
-  );
-}
-
-const THEMES: { id: Theme; label: string }[] = [
-  { id: 'auto', label: '端末の設定に合わせる' },
-  { id: 'light', label: 'ライト(明るい)' },
-  { id: 'dark', label: 'ダーク(暗い)' },
-];
-
-/** 表示の明るさ。この端末だけの設定(他の職員の画面は変わらない) */
-function ThemePicker() {
-  const [t, setT] = useState<Theme>(getTheme());
-  return (
-    <fieldset className="theme-picker">
-      <legend>画面の表示(この端末だけ)</legend>
-      <div className="chips-row">
-        {THEMES.map((x) => (
-          <button type="button" key={x.id} className={`chip ${t === x.id ? 'on' : ''}`} aria-pressed={t === x.id}
-            onClick={() => { setT(x.id); setTheme(x.id); }}>{x.label}</button>
-        ))}
-      </div>
-    </fieldset>
   );
 }
