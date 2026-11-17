@@ -178,6 +178,24 @@ async function login(page, pass) {
   // --- 全削除(Supabaseと同様に WHERE なしの全件削除をAPI経由で呼ぶ): 確認文字がないと押せない
   await op.click('nav.tabs a:has-text("管理")');
   await shot(op, '09-admin');
+  // --- 表示の切り替え: 端末がダークでも、ライトを選べば明るくなり、再読み込み後も保持される
+  const bg = () => op.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await op.emulateMedia({ colorScheme: 'dark' });
+  const darkBg = await bg();
+  await op.click('button.chip:has-text("ライト")');
+  const lightBg = await bg();
+  assert.notEqual(darkBg, lightBg, 'ライトを選ぶと背景が変わる');
+  assert.equal(lightBg, 'rgb(244, 246, 249)');
+  await shot(op, '09b-theme-light');
+  await op.reload();
+  await op.waitForSelector('button.chip:has-text("ライト")');
+  assert.equal(await bg(), 'rgb(244, 246, 249)', '再読み込み後も保持される');
+  await op.click('button.chip:has-text("ダーク")');
+  assert.equal(await bg(), 'rgb(17, 22, 29)');
+  await op.click('button.chip:has-text("端末の設定")');
+  assert.equal(await bg(), 'rgb(17, 22, 29)', '自動は端末の設定(ダーク)に従う');
+  await op.emulateMedia({ colorScheme: 'light' });
+  assert.equal(await bg(), 'rgb(244, 246, 249)');
   const purge = op.locator('button:has-text("すべて削除する")');
   assert.equal(await purge.isDisabled(), true);
   await op.fill('#purge', '全データを削除');

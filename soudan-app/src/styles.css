@@ -8,8 +8,20 @@
   --lv1: #fff3b0; --lv2: #ffe1de; --lv3: #ffc2bc; --lv4: #ff8f86; --lv5: #d93025;
   --over: #c62828;
 }
+:root[data-theme="dark"] {
+    --bg: #11161d; --card: #1a222d; --text: #e8edf4; --sub: #9aa7b8; --line: #2c3746;
+    --primary: #6aa5f0; --primary-text: #0b1a2e;
+    --wait: #ffd37a; --wait-bg: #4a3a12; --serve: #7be0a6; --serve-bg: #123a27;
+    --done: #b9c6d8; --done-bg: #2a3544; --warn: #ffb48a; --warn-bg: #4a2a18;
+    --danger: #ff8a80; --off: #94a0b0;
+    --cat-public: #7fb0f5; --cat-private: #52d1a8; --cat-finance: #c49bff;
+    --lv1: #5a4d10; --lv2: #4d2a28; --lv3: #6e302b; --lv4: #8f3a32; --lv5: #c62828;
+    --over: #e53935;
+  color-scheme: dark;
+}
+:root[data-theme="light"] { color-scheme: light; }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #11161d; --card: #1a222d; --text: #e8edf4; --sub: #9aa7b8; --line: #2c3746;
     --primary: #6aa5f0; --primary-text: #0b1a2e;
     --wait: #ffd37a; --wait-bg: #4a3a12; --serve: #7be0a6; --serve-bg: #123a27;
@@ -149,13 +161,15 @@ legend { font-weight: 700; font-size: 14px; padding: 0; margin-bottom: 6px; }
 .cat-public { --cat: var(--cat-public); } .cat-private { --cat: var(--cat-private); } .cat-finance { --cat: var(--cat-finance); }
 .cat-bar { border-left: 8px solid var(--cat, var(--line)); }
 .cat-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 99px; color: #fff; background: var(--cat); white-space: nowrap; }
-@media (prefers-color-scheme: dark) { .cat-tag { color: #0b1220; } }
+:root[data-theme="dark"] .cat-tag { color: #0b1220; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cat-tag { color: #0b1220; } }
 .group-title { font-size: 16px; margin: 18px 0 8px; padding: 6px 12px; border-left: 8px solid var(--cat, var(--primary)); background: var(--card); border-radius: 0 10px 10px 0; color: var(--cat, var(--text)); }
 .mine-title { --cat: var(--primary); }
 .group-label { font-size: 13px; font-weight: 700; margin: 10px 0 4px; color: var(--cat); }
 .radio-group { margin-bottom: 4px; }
 .cat-chip.on { background: var(--cat); border-color: var(--cat); color: #fff; }
-@media (prefers-color-scheme: dark) { .cat-chip.on { color: #0b1220; } }
+:root[data-theme="dark"] .cat-chip.on { color: #0b1220; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cat-chip.on { color: #0b1220; } }
 .cat-chip { border-left: 6px solid var(--cat); }
 
 /* ---- 待ち人数の色分け: 1人=薄黄 / 2〜4人=薄赤→濃い赤 / 5人以上=赤 */
