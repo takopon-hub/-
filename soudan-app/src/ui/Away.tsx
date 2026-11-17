@@ -12,7 +12,7 @@ export function AwaySheet({ ticketId, visitorId, deskName, onClose }: { ticketId
       <p className="hint">{deskName} の待ち行列から外れます。次の内容を相談者にお伝えし、了承を得てください。</p>
       <ul className="notice-list">
         <li>離席している間に、前の方の相談が終わってブースが空いた場合は、その次に並んでいる方を先にご案内することがあります。</li>
-        <li>戻られたら、職員に声をかけてください。{deskName} の待ち行列の最後尾に並び直します。</li>
+        <li>戻られたら、職員に声をかけてください。離席前の順番に戻ります。先に別の方をご案内していた場合は、次の順番でご案内します。</li>
       </ul>
       <div className="actions">
         <button className="btn primary" onClick={() => { onClose(); void act('away_ticket', { p_ticket_id: ticketId }, `${label} 離席`); }}>

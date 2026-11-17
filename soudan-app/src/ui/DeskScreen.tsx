@@ -96,7 +96,7 @@ export function DeskScreen({ id }: { id: number }) {
               return (
                 <li key={t.id} className="item">
                   <a className="grow name" href={`#/visitor/${t.visitorId}`}>{v ? `${pad3(v.no)} ${v.surname}さん` : ''}</a>
-                  {op && <button className="btn" onClick={() => act('resume_ticket', { p_ticket_id: t.id }, '離席から戻る')}>戻った(最後尾へ)</button>}
+                  {op && <button className="btn" onClick={() => act('resume_ticket', { p_ticket_id: t.id }, '離席から戻る')}>戻った(元の順番へ)</button>}
                 </li>
               );
             })}

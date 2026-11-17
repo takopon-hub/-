@@ -374,7 +374,9 @@ begin
   return jsonb_build_object('ok', true, 'already', false);
 end $$;
 
--- 昼食などで待ち行列から外れる(離席)。離席中は案内の対象にならず、戻ったら同じ相談先の最後尾に並び直す。
+-- 昼食などで待ち行列から外れる(離席)。離席中は案内の対象にならない。
+-- 順番(queue_at)はそのまま残すので、戻ると離席前の順番に戻る。離席中に後ろの人が先に案内されていれば、
+-- 戻った人が残りの待ち行列の先頭(次の順番)になる。
 create or replace function public.away_ticket(p_pass text, p_ticket_id uuid) returns jsonb
 language plpgsql security definer set search_path = app, public as $$
 declare t app.ticket;
@@ -398,7 +400,7 @@ begin
   if not found then raise exception 'E_NOT_FOUND: 待ち札が見つかりません'; end if;
   if t.status = 'waiting' then return jsonb_build_object('ok', true, 'already', true); end if;
   if t.status <> 'away' then raise exception 'E_BAD_STATE: 離席中ではありません(状況が変わりました)'; end if;
-  update app.ticket set status = 'waiting', queue_at = clock_timestamp() where id = p_ticket_id;
+  update app.ticket set status = 'waiting' where id = p_ticket_id;   -- queue_at は変えない(離席前の順番に戻る)
   perform app.log('離席から戻る', app.visitor_no(t.visitor_id) || ' desk ' || t.desk_id);
   return jsonb_build_object('ok', true, 'already', false);
 end $$;

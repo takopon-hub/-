@@ -228,7 +228,7 @@ test('操作ログに苗字が入らない', { skip }, async () => {
   assert.ok(!log.includes('個人情報テスト'));
 });
 
-test('離席: 待ち行列から外れ、次の人が先に案内され、戻ると最後尾に並び直す。二重実行・二重並びは拒否', { skip }, async () => {
+test('離席: 待ち行列から外れ、次の人が先に案内され、戻ると離席前の順番(残りの先頭)に戻る。二重実行・二重並びは拒否', { skip }, async () => {
   const d = await deskId('肥後銀行');
   const a = await reg('離席A', d), b = await reg('離席B', d), c = await reg('離席C', d);
   const tickets = async () => (await snap()).tickets;
@@ -241,13 +241,23 @@ test('離席: 待ち行列から外れ、次の人が先に案内され、戻る
   await rpc('start_ticket', [OP, b.t]);                       // 次の人を先に案内
   await rpc('resume_ticket', [OP, a.t]);
   assert.equal((await rpc('resume_ticket', [OP, a.t])).already, true);
-  assert.deepEqual((await queue(d)).filter((v) => [a.v, c.v].includes(v)), [c.v, a.v], '戻ると最後尾');
+  assert.deepEqual((await queue(d)).filter((v) => [a.v, c.v].includes(v)), [a.v, c.v], '戻ると離席前の順番(Cより前)');
   assert.equal((await tickets()).find((t) => t.id === a.t).status, 'waiting');
   await rpc('away_ticket', [OP, c.t]);
   await rpc('leave_visitor', [OP, c.v]);                      // 離席中の人が帰宅 → 取消になる
   assert.equal((await tickets()).find((t) => t.id === c.t).status, 'cancelled');
   await fails(rpc('away_ticket', [VW, a.t]), 'E_FORBIDDEN');
   await fails(rpc('away_ticket', [OP, b.t]), 'E_BAD_STATE');  // 相談中は離席にできない
+});
+
+test('離席: 誰も先に案内されなければ、戻ると元の位置(真ん中)に戻る', { skip }, async () => {
+  const d = await deskId('熊本銀行');
+  const a = await reg('順A', d), b = await reg('順B', d), c = await reg('順C', d);
+  const mine = async () => (await queue(d)).filter((v) => [a.v, b.v, c.v].includes(v));
+  await rpc('away_ticket', [OP, b.t]);
+  assert.deepEqual(await mine(), [a.v, c.v]);
+  await rpc('resume_ticket', [OP, b.t]);
+  assert.deepEqual(await mine(), [a.v, b.v, c.v]);
 });
 
 test('全削除: 確認文字が必要。相談者・待ち札・ログが消え、相談先は残り、パスコードを無効化できる', { skip }, async () => {

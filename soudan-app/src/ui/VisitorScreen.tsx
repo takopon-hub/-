@@ -66,7 +66,7 @@ export function VisitorScreen({ id }: { id: string }) {
             )}
             {current?.status === 'away' && (
               <>
-                <button className="btn primary" onClick={() => act('resume_ticket', { p_ticket_id: current.id }, `${label} 離席から戻る`)}>戻った(最後尾に並び直す)</button>
+                <button className="btn primary" onClick={() => act('resume_ticket', { p_ticket_id: current.id }, `${label} 離席から戻る`)}>戻った(離席前の順番に戻す)</button>
                 <button className="btn" onClick={() => act('cancel_ticket', { p_ticket_id: current.id }, '待ち取消')}>待ちを取り消す</button>
               </>
             )}
