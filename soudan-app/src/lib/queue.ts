@@ -1,6 +1,6 @@
 import type { Desk, Ticket, Visitor } from './types';
 
-/** 実績が少ないときに使う1回あたりの相談時間(分) */
+/** 待ち時間の目安に使う1人あたりの相談時間(分)。固定値。 */
 export const DEFAULT_MINUTES = 20;
 /** 実績をこの件数以上集めたら平均で置き換える */
 export const MIN_SAMPLES = 3;
@@ -55,8 +55,10 @@ export function waitLabel(minutes: number): string {
 
 /**
  * 待ち行列の目安を計算する。
- * 各ブースの空き見込み = 相談中の人の残り時間(平均 - 経過、最低1分)。空きブースは0。
- * 待機順に、最も早く空くブースへ割り当てていく。
+ * 目安 = (1 + 前に待っている人数) × 20分 − 相談中の人の経過時間。
+ * 例: 15分経過のブースで待ち3人 → 新しく並ぶ人は (1+3)×20 − 15 = 65分。
+ * 各ブースの空き見込み = 20分 − 経過(最低1分)。空きブースは0。待機順に最も早く空くブースへ割り当てる。
+ * 平均相談時間(avg)は実績表示用で、目安の計算には使わない。
  */
 export function deskState(desk: Desk, tickets: Ticket[], nowMs: number): DeskState {
   const { minutes: avg, samples } = avgMinutes(desk.id, tickets);
@@ -72,13 +74,13 @@ export function deskState(desk: Desk, tickets: Ticket[], nowMs: number): DeskSta
   const free: number[] = Array.from({ length: Math.max(desk.booths, 1) }, () => 0);
   serving.slice(0, free.length).forEach((t, i) => {
     const elapsed = (nowMs - ms(t.startedAt)) / 60000;
-    free[i] = Math.max(1, avg - (Number.isFinite(elapsed) ? elapsed : 0));
+    free[i] = Math.max(1, DEFAULT_MINUTES - (Number.isFinite(elapsed) ? elapsed : 0));
   });
 
   const waiting: WaitingEntry[] = waitingTickets.map((ticket) => {
     const i = free.indexOf(Math.min(...free));
     const waitMinutes = free[i];
-    free[i] += avg;
+    free[i] += DEFAULT_MINUTES;
     return { ticket, waitMinutes };
   });
   return { desk, waiting, serving, away, done, avg, samples, newArrivalWait: Math.min(...free) };

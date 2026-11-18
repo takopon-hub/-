@@ -58,6 +58,17 @@ describe('deskState', () => {
     ];
     expect(Math.round(deskState(desk(1), tickets, T0 + 15 * 60000).waiting[0].waitMinutes)).toBe(5);
   });
+  it('実績の平均に関係なく1人20分で計算する(15分経過・待ち3人 → 新規は65分)', () => {
+    const fast = [1, 2, 3].map((i) => tk({ deskId: 1, status: 'done', startedAt: at(-60 * i), endedAt: at(-60 * i + 5) }));
+    const tickets = [
+      ...fast,
+      tk({ deskId: 1, status: 'serving', booth: 1, startedAt: at(0) }),
+      ...[1, 2, 3].map((i) => tk({ deskId: 1, status: 'waiting', queuedAt: at(i) })),
+    ];
+    const s = deskState(desk(1), tickets, T0 + 15 * 60000);
+    expect(s.newArrivalWait).toBe(65);
+    expect(s.waiting.map((w) => w.waitMinutes)).toEqual([5, 25, 45]);
+  });
   it('超過していても最低1分とみなし、負の待ち時間にならない', () => {
     const tickets = [
       tk({ deskId: 1, status: 'serving', booth: 1, startedAt: at(0) }),
