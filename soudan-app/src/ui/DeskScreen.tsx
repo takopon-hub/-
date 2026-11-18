@@ -5,10 +5,12 @@ import { pad3 } from '../lib/format';
 import { BackLink, Badge, CategoryTag, Elapsed, Empty } from './common';
 import { NextSheet } from './NextSheet';
 import { GuideCard } from './Guide';
+import { useAsk } from './Confirm';
 import { Sheet } from './common';
 
 export function DeskScreen({ id }: { id: number }) {
   const { deskStates, snap, role, act, nowMs } = useStore();
+  const ask = useAsk();
   const [next, setNext] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [guide, setGuide] = useState<string | null>(null);   // 終了→次の行き先→次の人の案内、を一連で進める
@@ -64,7 +66,12 @@ export function DeskScreen({ id }: { id: number }) {
                   <small> {waitLabel(w.waitMinutes)}</small></a>
                 {op && (
                   <button className="btn primary" disabled={busy} title={busy ? '相談中の方がいます' : ''}
-                    onClick={() => act('start_ticket', { p_ticket_id: w.ticket.id }, '相談開始')}>
+                    onClick={async () => {
+                      if (await ask({ title: '案内して相談を開始', lines: [['相談者', `${v ? pad3(v.no) : ''} ${v?.surname ?? ''}さん`], ['案内先', s.desk.name]], okLabel: '案内して開始',
+                        note: i > 0 ? `待ち行列の先頭ではありません(${i + 1}番目)。先頭の方が不在の場合などに使います。` : undefined })) {
+                        await act('start_ticket', { p_ticket_id: w.ticket.id }, '相談開始');
+                      }
+                    }}>
                     {i === 0 ? '案内して開始' : '開始'}
                   </button>
                 )}

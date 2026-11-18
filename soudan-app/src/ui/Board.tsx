@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStore, storage } from '../lib/store';
 import { readyDesks, waitLabel, waitLevel, type DeskState } from '../lib/queue';
-import { CATEGORY_LABEL, pad3 } from '../lib/format';
+import { CATEGORY_LABEL, hhmm, minutesBetween, pad3 } from '../lib/format';
 import { GuideCard } from './Guide';
 import { Badge, CATEGORIES, CategoryTag, Elapsed, go } from './common';
 
@@ -123,6 +123,18 @@ function DeskCard({ s, nowMs, mine, onStar }: { s: DeskState; nowMs: number; min
           </ol>
         )}
       </div>
+      <details className="record">
+        <summary>相談実績 {s.done.length}件{s.done.length > 0 && ` / 平均${Math.round(s.avg)}分`}</summary>
+        {s.done.length === 0 ? <p className="hint">まだ相談を終えた方はいません</p> : (
+          <ol reversed>
+            {s.done.map((t) => {
+              const v = vname(t.visitorId);
+              const m = minutesBetween(t.startedAt, t.endedAt);
+              return <li key={t.id}>{v ? `${pad3(v.no)} ${v.surname}` : ''}{m !== null && <small> {m}分({hhmm(t.endedAt)}終了)</small>}</li>;
+            })}
+          </ol>
+        )}
+      </details>
     </article>
   );
 }

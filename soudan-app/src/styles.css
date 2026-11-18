@@ -230,3 +230,15 @@ legend { font-weight: 700; font-size: 14px; padding: 0; margin-bottom: 6px; }
 .topbar .btn.small { min-height: 36px; padding: 4px 10px; font-size: 13px; white-space: nowrap; }
 .role { white-space: nowrap; }
 .topbar strong span { display: inline-block; }
+
+/* 登録内容の確認画面 */
+.confirm-kv { display: block; margin: 8px 0 12px; }
+.confirm-row { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.confirm-row dt { width: 5.5em; flex: none; color: var(--sub); }
+.confirm-row dd { margin: 0; font-weight: 700; font-size: 17px; }
+
+/* 相談実績 */
+.record { margin: 6px 0 0; font-size: 13px; }
+.record summary { cursor: pointer; font-weight: 700; padding: 4px 0; }
+.record ol { margin: 4px 0 0; padding-left: 22px; line-height: 1.6; }
+.desk.lv5 .record { color: #fff; }

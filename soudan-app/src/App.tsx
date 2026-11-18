@@ -5,6 +5,7 @@ import { useRoute } from './ui/common';
 import { DeskScreen } from './ui/DeskScreen';
 import { Login } from './ui/Login';
 import { Register } from './ui/Register';
+import { ConfirmProvider } from './ui/Confirm';
 import { ThemeButton } from './ui/ThemeButton';
 import { VisitorScreen } from './ui/VisitorScreen';
 import { Visitors } from './ui/Visitors';
@@ -12,7 +13,7 @@ import { Visitors } from './ui/Visitors';
 export default function App() {
   return (
     <StoreProvider>
-      <Shell />
+      <ConfirmProvider><Shell /></ConfirmProvider>
     </StoreProvider>
   );
 }

@@ -35,6 +35,8 @@ export interface DeskState {
   serving: Ticket[];
   /** 離席中(待ち行列から外れている) */
   away: Ticket[];
+  /** 相談を終えた実績(終了が新しい順) */
+  done: Ticket[];
   avg: number;
   samples: number;
   /** いま並んだ場合の目安待ち時間(分) */
@@ -63,6 +65,7 @@ export function deskState(desk: Desk, tickets: Ticket[], nowMs: number): DeskSta
     .filter((t) => t.status === 'serving')
     .sort((a, b) => (a.booth ?? 0) - (b.booth ?? 0));
   // 待機順はサーバーが返した並び(queue_at, id 順)をそのまま使う。離席による入れ替えもこの順に反映される。
+  const done = mine.filter((t) => t.status === 'done').sort((a, b) => ms(b.endedAt) - ms(a.endedAt));
   const away = mine.filter((t) => t.status === 'away');
   const waitingTickets = mine.filter((t) => t.status === 'waiting');
 
@@ -78,7 +81,7 @@ export function deskState(desk: Desk, tickets: Ticket[], nowMs: number): DeskSta
     free[i] += avg;
     return { ticket, waitMinutes };
   });
-  return { desk, waiting, serving, away, avg, samples, newArrivalWait: Math.min(...free) };
+  return { desk, waiting, serving, away, done, avg, samples, newArrivalWait: Math.min(...free) };
 }
 
 export function allDeskStates(desks: Desk[], tickets: Ticket[], nowMs: number): DeskState[] {

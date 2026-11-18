@@ -2,10 +2,12 @@ import { useStore } from '../lib/store';
 import { pad3 } from '../lib/format';
 import type { DeskState } from '../lib/queue';
 import { go } from './common';
+import { useAsk } from './Confirm';
 
 /** ブースが空いていて待ちの人がいるとき、先頭の人の案内を促す(案内担当向け) */
 export function GuideCard({ s, link }: { s: DeskState; link?: boolean }) {
   const { snap, role, act } = useStore();
+  const ask = useAsk();
   const head = s.waiting[0];
   if (!head) return null;
   const v = snap?.visitors.find((x) => x.id === head.ticket.visitorId);
@@ -19,7 +21,11 @@ export function GuideCard({ s, link }: { s: DeskState; link?: boolean }) {
       </div>
       {role === 'operator' && (
         <div className="guide-actions">
-          <button className="btn primary" onClick={() => act('start_ticket', { p_ticket_id: head.ticket.id }, `${s.desk.name} 相談開始`)}>案内して開始</button>
+          <button className="btn primary" onClick={async () => {
+            if (await ask({ title: '案内して相談を開始', lines: [['相談者', label], ['案内先', s.desk.name]], okLabel: '案内して開始' })) {
+              await act('start_ticket', { p_ticket_id: head.ticket.id }, `${s.desk.name} 相談開始`);
+            }
+          }}>案内して開始</button>
           {second && (
             <button className="btn small" title="不在のとき、次の人と順番を入れ替えます"
               onClick={() => act('swap_tickets', { p_a: head.ticket.id, p_b: second.ticket.id }, `${v?.surname ?? ''}さんを次と入替`)}>

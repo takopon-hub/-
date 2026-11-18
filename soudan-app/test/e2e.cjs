@@ -109,10 +109,15 @@ async function login(page, pass) {
   await op.waitForSelector('[role=dialog]');
   await shot(op, '04-move-sheet');
   await op.click('[role=dialog] button.row-btn:has-text("熊本信用金庫")');
+  await op.waitForSelector('[data-confirm-ok]');
+  await op.click('[data-confirm-ok]');
   await op.waitForFunction(() => ![...document.querySelectorAll('ol.numbered li .name')].some((e) => e.textContent.includes('003')));
 
   // --- 佐藤を開始 → 20分超の強調(DBで開始時刻を25分前にずらす)
   await op.locator('ol.numbered li').first().locator('button:has-text("案内して開始")').click();
+  await op.waitForSelector('[data-confirm-ok]');
+  assert.match(await op.locator('[role=dialog]:has([data-confirm-ok])').innerText(), /案内先[\s\S]*肥後銀行/);
+  await op.click('[data-confirm-ok]');
   await op.waitForSelector('.elapsed');
   assert.equal(await op.locator('.elapsed.over').count(), 0, '開始直後は強調しない');
   if (pg) {
@@ -127,12 +132,16 @@ async function login(page, pass) {
   await op.waitForSelector('[role=dialog]');
   assert.equal(await op.locator('[role=dialog] h3:has-text("受付時に希望していた")').count(), 0);
   await op.click('[role=dialog] button.row-btn:has-text("熊本弁護士会①")');
+  await op.waitForSelector('[data-confirm-ok]');
+  await op.click('[data-confirm-ok]');
 
   // --- 一連の流れ: 行き先を決めたあと、続けて次の人(山田)の案内シートが出る → そこから開始
   await op.waitForSelector('[role=dialog]:has-text("続けて、次の方をご案内")');
   assert.match(await op.locator('[role=dialog]').innerText(), /001 山田さん/);
   await shot(op, '05b-guide-sheet');
   await op.click('[role=dialog] button:has-text("案内して開始")');
+  await op.waitForSelector('[data-confirm-ok]');
+  await op.click('[data-confirm-ok]');
   await op.waitForSelector('ul.list li:has-text("001 山田")');
   await op.click('button:has-text("終了")');
   await op.waitForSelector('[role=dialog] h3:has-text("受付時に希望していた")');
@@ -141,6 +150,9 @@ async function login(page, pass) {
   assert.equal(await op.locator('[role=dialog] .badge:has-text("希望")').count(), 2);
   await shot(op, '06-next-sheet');
   await op.click('[role=dialog] button.row-btn:has-text("熊本銀行")');
+  await op.waitForSelector('[data-confirm-ok]');
+  assert.match(await op.locator('[role=dialog]:has([data-confirm-ok])').innerText(), /行き先[\s\S]*熊本銀行/); await shot(op, '06b-confirm');
+  await op.click('[data-confirm-ok]');
   await op.click('[role=dialog] button:has-text("あとで")');
 
   // --- 閲覧者: メモ・操作ボタンなし、希望先は見える
@@ -163,6 +175,23 @@ async function login(page, pass) {
   await op.click('button:has-text("戻った")');
   await op.waitForSelector('.badge:has-text("待機中")');
 
+  // --- 確認画面で「やめる」を押すと登録されない
+  await op.click('nav.tabs a:has-text("相談者")');
+  await op.click('a.row-btn:has-text("鈴木")');
+  await op.click('button:text-is("帰宅")');
+  await op.waitForSelector('[data-confirm-cancel]');
+  await op.click('[data-confirm-cancel]');
+  assert.equal(await op.locator('.badge:text-is("帰宅")').count(), 0, 'やめるを押すと帰宅にならない');
+
+  // --- ボードの相談先カードに相談実績(完了件数と一覧)が出る
+  await op.click('nav.tabs a:has-text("ボード")');
+  await op.waitForSelector('article.desk:has(h3:text-is("肥後銀行")) .record');
+  await op.click('article.desk:has(h3:text-is("肥後銀行")) .record summary');
+  const rec = await op.locator('article.desk:has(h3:text-is("肥後銀行")) .record').innerText();
+  assert.match(rec, /相談実績 2件/);
+  assert.match(rec, /002 佐藤/);
+  await shot(op, '06c-record');
+
   // --- 閲覧者も、画面上部のボタンで 自動 → ライト → ダーク と切り替えられる
   const vbg = () => vw.evaluate(() => getComputedStyle(document.body).backgroundColor);
   await vw.emulateMedia({ colorScheme: 'dark' });
@@ -181,6 +210,8 @@ async function login(page, pass) {
   await op.click('a.row-btn:has-text("田中")');
   await opCtx.setOffline(true);
   await op.click('button:text-is("帰宅")');
+  await op.waitForSelector('[data-confirm-ok]');
+  await op.click('[data-confirm-ok]');
   await op.waitForSelector('.banner.warn:has-text("未送信")');
   await op.waitForSelector('.banner.error:has-text("通信できません")', { timeout: 8000 });
   await shot(op, '08-offline');

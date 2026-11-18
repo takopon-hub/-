@@ -2,6 +2,7 @@ import { useStore } from '../lib/store';
 import { waitLabel } from '../lib/queue';
 import { newId, pad3 } from '../lib/format';
 import { Sheet, Badge, CategoryTag } from './common';
+import { useAsk } from './Confirm';
 
 interface Props {
   visitorId: string;
@@ -19,6 +20,7 @@ interface Props {
  */
 export function NextSheet({ visitorId, onClose, moveTicketId, fromDeskId, onChosen }: Props) {
   const { views, deskStates, act } = useStore();
+  const ask = useAsk();
   const view = views.find((v) => v.visitor.id === visitorId);
   if (!view) return null;
   const { visitor } = view;
@@ -26,7 +28,16 @@ export function NextSheet({ visitorId, onClose, moveTicketId, fromDeskId, onChos
   const label = `${pad3(visitor.no)} ${visitor.surname}`;
 
   async function choose(deskId: number) {
-    onChosen?.(`${deskStates.find((d) => d.desk.id === deskId)?.desk.name ?? ''}へ`);
+    const target = deskStates.find((d) => d.desk.id === deskId);
+    const name = target?.desk.name ?? '';
+    const from = fromDeskId !== undefined ? deskStates.find((d) => d.desk.id === fromDeskId)?.desk.name ?? '' : '';
+    const ok = await ask(moveTicketId
+      ? { title: '付け替えの確認', okLabel: '付け替える',
+          lines: [['相談者', `${label}さん`], ['移動', `${from} → ${name}`], ['順番', `${name} の待ち行列の最後尾(待ち${target?.waiting.length ?? 0}人)`]] }
+      : { title: '次の行き先の確認', okLabel: '待ち行列に並ばせる',
+          lines: [['相談者', `${label}さん`], ['行き先', name], ['順番', `待ち行列の最後尾(いま待ち${target?.waiting.length ?? 0}人 / ${waitLabel(target?.newArrivalWait ?? 0)})`]] });
+    if (!ok) return;
+    onChosen?.(`${name}へ`);
     onClose();
     if (moveTicketId) {
       await act('move_ticket', { p_ticket_id: moveTicketId, p_new_ticket_id: newId(), p_desk_id: deskId }, `${label} を付け替え`);
@@ -35,6 +46,9 @@ export function NextSheet({ visitorId, onClose, moveTicketId, fromDeskId, onChos
     }
   }
   async function leave() {
+    const ok = await ask({ title: '帰宅の確認', okLabel: '帰宅として登録する',
+      lines: [['相談者', `${label}さん`], ['登録', '帰宅(待ち行列に並んでいれば取り消されます)']] });
+    if (!ok) return;
     onChosen?.('帰宅');
     onClose();
     await act('leave_visitor', { p_visitor_id: visitorId }, `${label} 帰宅`);

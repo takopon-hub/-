@@ -4,11 +4,13 @@ import { TICKET_LABEL, hhmm, minutesBetween, pad3 } from '../lib/format';
 import { BackLink, Badge, Elapsed, Empty, useDeskMap } from './common';
 import { NextSheet } from './NextSheet';
 import { AwaySheet } from './Away';
+import { useAsk } from './Confirm';
 import { whereLabel } from './Visitors';
 
 export function VisitorScreen({ id }: { id: string }) {
   const { views, role, act, nowMs } = useStore();
   const desks = useDeskMap();
+  const ask = useAsk();
   const [sheet, setSheet] = useState(false);
   const [move, setMove] = useState(false);
   const [away, setAway] = useState(false);
@@ -80,7 +82,11 @@ export function VisitorScreen({ id }: { id: string }) {
               <button className="btn" onClick={() => setSheet(true)}>別の相談先へ並ぶ</button>
             )}
             {visitor.status === 'in' && (
-              <button className="btn" onClick={() => act('leave_visitor', { p_visitor_id: id }, `${label} 帰宅`)}>帰宅</button>
+              <button className="btn" onClick={async () => {
+                if (await ask({ title: '帰宅の確認', okLabel: '帰宅として登録する', lines: [['相談者', `${label}さん`], ['登録', '帰宅(待ち行列に並んでいれば取り消されます)']] })) {
+                  await act('leave_visitor', { p_visitor_id: id }, `${label} 帰宅`);
+                }
+              }}>帰宅</button>
             )}
             {visitor.status === 'left' && (
               <button className="btn" onClick={() => act('reopen_visitor', { p_visitor_id: id }, '帰宅を取り消し')}>帰宅を取り消す</button>
