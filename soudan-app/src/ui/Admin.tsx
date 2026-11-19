@@ -20,7 +20,7 @@ export function Admin() {
       <Passcodes />
       <Purge />
       <h3 className="section">操作ログ</h3>
-      <button className="btn" onClick={() => setLog(true)}>操作ログを見る(氏名・電話番号は含みません)</button>
+      <button className="btn" onClick={() => setLog(true)}>操作ログを見る(個人情報は含みません)</button>
       {log && <LogSheet onClose={() => setLog(false)} />}
     </>
   );
@@ -100,14 +100,14 @@ function Purge() {
       <h3 className="section danger-title">相談会終了後のデータ削除</h3>
       <form className="card form danger" onSubmit={async (e) => {
         e.preventDefault();
-        if (!confirm(`受付済み ${n} 人分の氏名・電話番号・相談履歴をすべて削除します。元に戻せません。本当に削除しますか?`)) return;
+        if (!confirm(`受付済み ${n} 人分の受付番号・相談履歴をすべて削除します。元に戻せません。本当に削除しますか?`)) return;
         try {
           await call('purge_all', { p_confirm: text, p_revoke_passcodes: revoke });
           notify('すべて削除しました');
           if (revoke) logout();
         } catch (e2) { notify(e2 instanceof ApiError ? e2.message : '削除できませんでした', 'error'); }
       }}>
-        <p>受付した方の苗字・携帯電話番号・メモ・相談履歴と操作ログをすべて削除します。相談先の設定は残ります。</p>
+        <p>受付した方の受付番号・相談履歴と操作ログをすべて削除します。相談先の設定は残ります。</p>
         <label htmlFor="purge">確認のため「{CONFIRM}」と入力してください</label>
         <input id="purge" value={text} onChange={(e) => setText(e.target.value)} autoComplete="off" />
         <label className="check"><input type="checkbox" checked={revoke} onChange={(e) => setRevoke(e.target.checked)} />

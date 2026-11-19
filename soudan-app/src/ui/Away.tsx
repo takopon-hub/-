@@ -1,12 +1,12 @@
 import { useStore } from '../lib/store';
-import { pad3 } from '../lib/format';
+import { noLabel } from '../lib/format';
 import { Sheet } from './common';
 
 /** 昼食などで待ち行列から外れる(離席)前に、相談者へ説明して了承を得るための確認画面 */
 export function AwaySheet({ ticketId, visitorId, deskName, onClose }: { ticketId: string; visitorId: string; deskName: string; onClose: () => void }) {
   const { views, act } = useStore();
   const v = views.find((x) => x.visitor.id === visitorId)?.visitor;
-  const label = v ? `${pad3(v.no)} ${v.surname}さん` : '';
+  const label = noLabel(v);
   return (
     <Sheet title={`${label} 離席(待ちから外れる)`} onClose={onClose}>
       <p className="hint">{deskName} の待ち行列から外れます。次の内容を相談者にお伝えし、了承を得てください。</p>

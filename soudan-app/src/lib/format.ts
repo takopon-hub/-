@@ -37,3 +37,6 @@ export function newId(): string {
     return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
   });
 }
+
+/** 相談者の呼び名。個人情報は持たないので受付番号だけで呼ぶ(例: 012番) */
+export const noLabel = (v: { no: number } | null | undefined): string => (v ? `${pad3(v.no)}番` : '');

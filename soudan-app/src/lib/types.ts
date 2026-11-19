@@ -15,13 +15,10 @@ export interface Desk {
 export interface Visitor {
   id: string;
   no: number;
-  surname: string;
   status: 'in' | 'left';
   /** 相談を希望する相談先(最初に並ぶ先を含む。あとから並んだ先も加わる) */
   wishes: number[];
   createdAt: string;
-  /** 操作者にだけ含まれる */
-  memo?: string;
 }
 
 export interface Ticket {

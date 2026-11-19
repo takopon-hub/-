@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store';
-import { TICKET_LABEL, hhmm, minutesBetween, pad3 } from '../lib/format';
+import { TICKET_LABEL, hhmm, minutesBetween, pad3, noLabel } from '../lib/format';
 import { BackLink, Badge, Elapsed, Empty, useDeskMap } from './common';
 import { NextSheet } from './NextSheet';
 import { AwaySheet } from './Away';
@@ -22,7 +22,7 @@ export function VisitorScreen({ id }: { id: string }) {
   const deskName = (d: number) => desks.get(d)?.name ?? '';
   const w = whereLabel(view, deskName);
   const last = [...history].reverse().find((t) => t.status !== 'moved');
-  const label = `${pad3(visitor.no)} ${visitor.surname}`;
+  const label = noLabel(visitor);
 
   return (
     <>
@@ -31,7 +31,7 @@ export function VisitorScreen({ id }: { id: string }) {
         <div className="visitor-head">
           <div className="big-no sm">{pad3(visitor.no)}</div>
           <div className="grow">
-            <h2>{visitor.surname}さん</h2>
+            <h2>{noLabel(visitor)}</h2>
             <Badge kind={w.kind}>{w.text}</Badge>
           </div>
         </div>
@@ -44,11 +44,9 @@ export function VisitorScreen({ id }: { id: string }) {
               </span>
             ))}
           </dd>
-          {op && <><dt>メモ</dt><dd>{visitor.memo || '—'}</dd></>}
         </dl>
-        {op && edit && <EditForm visitorId={id} surname={visitor.surname} memo={visitor.memo ?? ''} wishes={visitor.wishes} onDone={() => setEdit(false)} />}
-        {op && !edit && <button className="btn ghost" onClick={() => setEdit(true)}>名前・メモ・希望先を修正</button>}
-        {!op && <p className="hint">メモは操作者のみ表示されます。</p>}
+        {op && edit && <EditForm visitorId={id} wishes={visitor.wishes} onDone={() => setEdit(false)} />}
+        {op && !edit && <button className="btn ghost" onClick={() => setEdit(true)}>希望先を修正</button>}
         {wishesLeft.length > 0 && visitor.status === 'in' && (
           <p className="hint">まだ相談していない希望: {wishesLeft.map(deskName).join('、')}</p>
         )}
@@ -83,7 +81,7 @@ export function VisitorScreen({ id }: { id: string }) {
             )}
             {visitor.status === 'in' && (
               <button className="btn" onClick={async () => {
-                if (await ask({ title: '帰宅の確認', okLabel: '帰宅として登録する', lines: [['相談者', `${label}さん`], ['登録', '帰宅(待ち行列に並んでいれば取り消されます)']] })) {
+                if (await ask({ title: '帰宅の確認', okLabel: '帰宅として登録する', lines: [['相談者', `${label}`], ['登録', '帰宅(待ち行列に並んでいれば取り消されます)']] })) {
                   await act('leave_visitor', { p_visitor_id: id }, `${label} 帰宅`);
                 }
               }}>帰宅</button>
@@ -124,20 +122,16 @@ export function VisitorScreen({ id }: { id: string }) {
   );
 }
 
-function EditForm({ visitorId, surname, memo, wishes, onDone }: { visitorId: string; surname: string; memo: string; wishes: number[]; onDone(): void }) {
+function EditForm({ visitorId, wishes, onDone }: { visitorId: string; wishes: number[]; onDone(): void }) {
   const { act, snap } = useStore();
-  const [s, setS] = useState(surname);
-  const [m, setM] = useState(memo);
   const [w, setW] = useState(wishes);
   const toggle = (d: number) => setW((x) => (x.includes(d) ? x.filter((y) => y !== d) : [...x, d]));
   return (
     <form className="form" onSubmit={async (e) => {
       e.preventDefault();
-      const r = await act('update_visitor', { p_visitor_id: visitorId, p_surname: s.trim(), p_memo: m.trim(), p_wishes: w }, '情報修正');
+      const r = await act('update_visitor', { p_visitor_id: visitorId, p_wishes: w }, '情報修正');
       if (r !== false) onDone();
     }}>
-      <label htmlFor="e-s">苗字</label><input id="e-s" value={s} maxLength={20} onChange={(e) => setS(e.target.value)} />
-      <label htmlFor="e-m">メモ(60文字まで)</label><input id="e-m" value={m} maxLength={60} onChange={(e) => setM(e.target.value)} />
       <fieldset>
         <legend>希望の相談先</legend>
         <div className="chips-row">
@@ -147,7 +141,7 @@ function EditForm({ visitorId, surname, memo, wishes, onDone }: { visitorId: str
           ))}
         </div>
       </fieldset>
-      <div className="actions"><button className="btn primary" disabled={!s.trim()}>保存</button><button type="button" className="btn ghost" onClick={onDone}>キャンセル</button></div>
+      <div className="actions"><button className="btn primary">保存</button><button type="button" className="btn ghost" onClick={onDone}>キャンセル</button></div>
     </form>
   );
 }

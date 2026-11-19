@@ -43,13 +43,14 @@ async function login(page, pass) {
   await login(op, OP);
   await op.waitForSelector('text=操作者');
 
-  // --- 受付: 苗字・最初の相談先・希望先。電話番号の入力欄はない
-  async function register(surname, firstDesk, wishDesks = []) {
+  // --- 受付: 最初の相談先・希望先だけ。氏名・電話・メモの入力欄はない(番号管理)
+  async function register(firstDesk, wishDesks = []) {
     await op.click('nav.tabs a:has-text("受付")');
     const next = op.locator('button:has-text("次の方を受付する")');
     if (await next.count()) await next.click();
     assert.equal(await op.locator('#phone').count(), 0, '電話番号の入力欄がない');
-    await op.fill('#surname', surname);
+    assert.equal(await op.locator('#surname').count(), 0, '氏名の入力欄がない');
+    assert.equal(await op.locator('#memo').count(), 0, 'メモ欄もない');
     await op.click(`label.radio:has-text("${firstDesk}")`);
     for (const w of wishDesks) await op.click(`button.chip:text-is("${w}")`);
     assert.equal(await op.locator('.check').count(), 0, '同意チェックはない');
@@ -57,10 +58,10 @@ async function login(page, pass) {
     await op.waitForSelector('.big-no');
     return (await op.locator('.big-no').innerText()).trim();
   }
-  const n1 = await register('山田', '肥後銀行', ['熊本銀行', '熊本弁護士会①']);
+  const n1 = await register('肥後銀行', ['熊本銀行', '熊本弁護士会①']);
   assert.equal(n1, '001');
-  for (const s of ['佐藤', '鈴木', '田中', '高橋']) await register(s, '肥後銀行');
-  await register('中村', '熊本弁護士会①');
+  for (let i = 0; i < 4; i++) await register('肥後銀行');
+  await register('熊本弁護士会①');
   await op.click('nav.tabs a:has-text("受付")');
   await op.click('button:has-text("次の方を受付する")');
   await shot(op, '01-register-form');
@@ -98,14 +99,14 @@ async function login(page, pass) {
   await op.click('article.desk:has(h3:text-is("肥後銀行")) h3');
   await op.waitForSelector('ol.numbered li');
   const order = () => op.locator('ol.numbered li .name').evaluateAll((els) => els.map((e) => e.childNodes[0].textContent.trim()));
-  assert.deepEqual((await order()).slice(0, 3), ['001 山田さん', '002 佐藤さん', '003 鈴木さん']);
+  assert.deepEqual((await order()).slice(0, 3), ['001番', '002番', '003番']);
   await op.locator('ol.numbered li').first().locator('button:has-text("不在 → 次の人と入替")').click();
   await op.waitForFunction(() => document.querySelector('ol.numbered li .name')?.textContent?.startsWith('002'));
-  assert.deepEqual((await order()).slice(0, 3), ['002 佐藤さん', '001 山田さん', '003 鈴木さん']);
+  assert.deepEqual((await order()).slice(0, 3), ['002番', '001番', '003番']);
   await shot(op, '03-desk-swapped');
 
   // --- 付け替え: 鈴木(3番目)を熊本信用金庫の最後尾へ
-  await op.locator('ol.numbered li', { hasText: '003 鈴木' }).locator('button:has-text("別の相談先へ付け替え")').click();
+  await op.locator('ol.numbered li', { hasText: '003番' }).locator('button:has-text("別の相談先へ付け替え")').click();
   await op.waitForSelector('[role=dialog]');
   await shot(op, '04-move-sheet');
   await op.click('[role=dialog] button.row-btn:has-text("熊本信用金庫")');
@@ -137,12 +138,12 @@ async function login(page, pass) {
 
   // --- 一連の流れ: 行き先を決めたあと、続けて次の人(山田)の案内シートが出る → そこから開始
   await op.waitForSelector('[role=dialog]:has-text("続けて、次の方をご案内")');
-  assert.match(await op.locator('[role=dialog]').innerText(), /001 山田さん/);
+  assert.match(await op.locator('[role=dialog]').innerText(), /001番/);
   await shot(op, '05b-guide-sheet');
   await op.click('[role=dialog] button:has-text("案内して開始")');
   await op.waitForSelector('[data-confirm-ok]');
   await op.click('[data-confirm-ok]');
-  await op.waitForSelector('ul.list li:has-text("001 山田")');
+  await op.waitForSelector('ul.list li:has-text("001番")');
   await op.click('button:has-text("終了")');
   await op.waitForSelector('[role=dialog] h3:has-text("受付時に希望していた")');
   const wished = await op.locator('[role=dialog] ul.list').first().locator('li strong').allInnerTexts();
@@ -157,8 +158,8 @@ async function login(page, pass) {
 
   // --- 閲覧者: メモ・操作ボタンなし、希望先は見える
   await vw.click('nav.tabs a:has-text("相談者")');
-  await vw.click('a.row-btn:has-text("山田")');
-  await vw.waitForSelector('text=メモは操作者のみ表示されます');
+  await vw.click('a.row-btn:has-text("001番")');
+  await vw.waitForSelector('h2:has-text("001番")');
   assert.equal(await vw.locator('button:has-text("帰宅")').count(), 0);
   const vwText = await vw.locator('main').innerText();
   assert.ok(vwText.includes('熊本銀行') && !/携帯|電話/.test(vwText), '閲覧者に電話・携帯の表示がない');
@@ -166,7 +167,7 @@ async function login(page, pass) {
 
   // --- 離席: 相談者画面から、説明・了承つきで待ち行列から外れる → 戻ると最後尾
   await op.click('nav.tabs a:has-text("相談者")');
-  await op.click('a.row-btn:has-text("高橋")');
+  await op.click('a.row-btn:has-text("005番")');
   await op.click('button:has-text("昼食などで離席")');
   await op.waitForSelector('[role=dialog]:has-text("先にご案内することがあります")');
   await shot(op, '07b-away-sheet');
@@ -177,7 +178,7 @@ async function login(page, pass) {
 
   // --- 確認画面で「やめる」を押すと登録されない
   await op.click('nav.tabs a:has-text("相談者")');
-  await op.click('a.row-btn:has-text("鈴木")');
+  await op.click('a.row-btn:has-text("003番")');
   await op.click('button:text-is("帰宅")');
   await op.waitForSelector('[data-confirm-cancel]');
   await op.click('[data-confirm-cancel]');
@@ -189,7 +190,7 @@ async function login(page, pass) {
   await op.click('article.desk:has(h3:text-is("肥後銀行")) .record summary');
   const rec = await op.locator('article.desk:has(h3:text-is("肥後銀行")) .record').innerText();
   assert.match(rec, /相談実績 2件/);
-  assert.match(rec, /002 佐藤/);
+  assert.match(rec, /002番/);
   await shot(op, '06c-record');
 
   // --- 閲覧者も、画面上部のボタンで 自動 → ライト → ダーク と切り替えられる
@@ -207,7 +208,7 @@ async function login(page, pass) {
 
   // --- 通信断: オフラインで「帰宅」→ 保存され、復帰後に自動送信される
   await op.click('nav.tabs a:has-text("相談者")');
-  await op.click('a.row-btn:has-text("田中")');
+  await op.click('a.row-btn:has-text("004番")');
   await opCtx.setOffline(true);
   await op.click('button:text-is("帰宅")');
   await op.waitForSelector('[data-confirm-ok]');

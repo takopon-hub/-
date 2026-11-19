@@ -14,8 +14,12 @@ describe('schema.sql', () => {
     expect(bad).toEqual([]);
   });
 
-  it('電話番号を保存する列を持たない', () => {
+  it('個人情報(氏名・電話番号・メモ)を保存する列を持たない。旧列を消す alter 以外に登場しない', () => {
     expect(body).not.toMatch(/\bphone\b/i);
+    const rest = body.replace(/alter table app\.visitor drop column if exists (surname|memo)/gi, '');
+    expect(rest).not.toMatch(/\b(surname|memo|p_surname|p_memo|name_kana)\b/i);
+    const visitorTable = body.match(/create table if not exists app\.visitor \(([\s\S]*?)\);/i)![1];
+    expect(visitorTable).not.toMatch(/\btext\b(?! *\[)[^,]*check \(length/i);
   });
 
   it('public の関数はすべてパスコードを先頭引数に取る(権限判定の漏れ防止)', () => {

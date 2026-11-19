@@ -5,12 +5,10 @@ import { waitLabel } from '../lib/queue';
 import { CATEGORY_LABEL, newId, pad3 } from '../lib/format';
 import { CATEGORIES, CategoryTag } from './common';
 
-interface Done { no: number; surname: string; deskName: string }
+interface Done { no: number; deskName: string }
 
 export function Register() {
   const { deskStates, call, notify } = useStore();
-  const [surname, setSurname] = useState('');
-  const [memo, setMemo] = useState('');
   const [first, setFirst] = useState<number | null>(null);
   const [wishes, setWishes] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
@@ -20,7 +18,7 @@ export function Register() {
   const ids = useRef({ visitor: newId(), ticket: newId() });
 
   const active = deskStates.filter((s) => s.desk.active);
-  const valid = surname.trim().length > 0 && first !== null;
+  const valid = first !== null;
   const toggleWish = (id: number) => setWishes((w) => (w.includes(id) ? w.filter((x) => x !== id) : [...w, id]));
 
   async function submit(e: React.FormEvent) {
@@ -31,11 +29,11 @@ export function Register() {
     try {
       const r = await call<{ no: number }>('register_visitor', {
         p_visitor_id: ids.current.visitor, p_ticket_id: ids.current.ticket,
-        p_surname: surname.trim(), p_desk_id: first, p_wishes: wishes, p_memo: memo.trim(),
+        p_desk_id: first, p_wishes: wishes,
       });
-      setDone({ no: r.no, surname: surname.trim(), deskName: deskStates.find((s) => s.desk.id === first)?.desk.name ?? '' });
+      setDone({ no: r.no, deskName: deskStates.find((s) => s.desk.id === first)?.desk.name ?? '' });
       ids.current = { visitor: newId(), ticket: newId() };
-      setSurname(''); setMemo(''); setFirst(null); setWishes([]);
+      setFirst(null); setWishes([]);
     } catch (e2) {
       if (e2 instanceof NetworkError) setErr('通信できませんでした。電波を確認して、もう一度「受付する」を押してください(二重に登録されることはありません)。');
       else if (e2 instanceof ApiError) setErr(e2.message);
@@ -50,8 +48,8 @@ export function Register() {
       <section className="card done-card" role="status">
         <p>受付番号</p>
         <div className="big-no">{pad3(done.no)}</div>
-        <p><strong>{done.surname}</strong>さん → {done.deskName}</p>
-        <p className="hint">番号札に番号を書いてお渡しください。</p>
+        <p>→ {done.deskName}</p>
+        <p className="hint">番号札に番号を書いてお渡しください。お名前などは伺いません。この番号で呼び出します。</p>
         <button className="btn primary block" onClick={() => setDone(null)}>次の方を受付する</button>
       </section>
     );
@@ -60,8 +58,7 @@ export function Register() {
   return (
     <form onSubmit={submit} className="card form">
       <h2>新規受付</h2>
-      <label htmlFor="surname">お名前(苗字のみ)</label>
-      <input id="surname" value={surname} maxLength={20} autoComplete="off" onChange={(e) => setSurname(e.target.value)} />
+      <p className="hint">お名前・電話番号などは取りません。受付番号だけで管理します。</p>
 
       <fieldset>
         <legend>最初に並ぶ相談先(1つ選ぶ)</legend>
@@ -95,9 +92,6 @@ export function Register() {
           ))}
         </div>
       </fieldset>
-
-      <label htmlFor="memo">メモ(任意・60文字まで。相談内容など詳しい事情は書かないでください)</label>
-      <input id="memo" value={memo} maxLength={60} autoComplete="off" onChange={(e) => setMemo(e.target.value)} />
 
       {err && <p className="error" role="alert">{err}</p>}
       <button className="btn primary block" disabled={!valid || busy}>{busy ? '登録中…' : '受付する'}</button>

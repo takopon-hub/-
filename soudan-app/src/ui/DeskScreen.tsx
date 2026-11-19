@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store';
 import { waitLabel } from '../lib/queue';
-import { pad3 } from '../lib/format';
+import { noLabel } from '../lib/format';
 import { BackLink, Badge, CategoryTag, Elapsed, Empty } from './common';
 import { NextSheet } from './NextSheet';
 import { GuideCard } from './Guide';
@@ -44,7 +44,7 @@ export function DeskScreen({ id }: { id: number }) {
           const v = visitor(t.visitorId);
           return (
             <li key={t.id} className="item">
-              <a className="grow name" href={`#/visitor/${t.visitorId}`}>{v ? `${pad3(v.no)} ${v.surname}さん` : ''}</a>
+              <a className="grow name" href={`#/visitor/${t.visitorId}`}>{noLabel(v)}</a>
               <Elapsed startedAt={t.startedAt} nowMs={nowMs} />
               {op && <button className="btn primary" onClick={() => finish(t.id, t.visitorId)}>終了</button>}
             </li>
@@ -62,12 +62,12 @@ export function DeskScreen({ id }: { id: number }) {
             <li key={w.ticket.id} className="item stack">
               <div className="line">
                 <span className="pos">{i + 1}</span>
-                <a className="grow name" href={`#/visitor/${w.ticket.visitorId}`}>{v ? `${pad3(v.no)} ${v.surname}さん` : ''}
+                <a className="grow name" href={`#/visitor/${w.ticket.visitorId}`}>{noLabel(v)}
                   <small> {waitLabel(w.waitMinutes)}</small></a>
                 {op && (
                   <button className="btn primary" disabled={busy} title={busy ? '相談中の方がいます' : ''}
                     onClick={async () => {
-                      if (await ask({ title: '案内して相談を開始', lines: [['相談者', `${v ? pad3(v.no) : ''} ${v?.surname ?? ''}さん`], ['案内先', s.desk.name]], okLabel: '案内して開始',
+                      if (await ask({ title: '案内して相談を開始', lines: [['相談者', noLabel(v)], ['案内先', s.desk.name]], okLabel: '案内して開始',
                         note: i > 0 ? `待ち行列の先頭ではありません(${i + 1}番目)。先頭の方が不在の場合などに使います。` : undefined })) {
                         await act('start_ticket', { p_ticket_id: w.ticket.id }, '相談開始');
                       }
@@ -80,13 +80,13 @@ export function DeskScreen({ id }: { id: number }) {
                 <div className="line sub-actions">
                   {nextOne && (
                     <button className="btn small" title="呼び出したが不在のとき、次の人と順番を入れ替えます"
-                      onClick={() => act('swap_tickets', { p_a: w.ticket.id, p_b: nextOne.ticket.id }, `${v?.surname ?? ''}さんを次と入替`)}>
+                      onClick={() => act('swap_tickets', { p_a: w.ticket.id, p_b: nextOne.ticket.id }, `${noLabel(v)}を次と入替`)}>
                       不在 → 次の人と入替
                     </button>
                   )}
                   <button className="btn small" onClick={() => setMove({ ticketId: w.ticket.id, visitorId: w.ticket.visitorId })}>別の相談先へ付け替え</button>
                   <button className="btn small ghost" onClick={() => {
-                    if (confirm(`${v?.surname ?? ''}さんの待ちを取り消しますか?`)) void act('cancel_ticket', { p_ticket_id: w.ticket.id }, '待ち取消');
+                    if (confirm(`${noLabel(v)}の待ちを取り消しますか?`)) void act('cancel_ticket', { p_ticket_id: w.ticket.id }, '待ち取消');
                   }}>取消</button>
                 </div>
               )}
@@ -102,7 +102,7 @@ export function DeskScreen({ id }: { id: number }) {
               const v = visitor(t.visitorId);
               return (
                 <li key={t.id} className="item">
-                  <a className="grow name" href={`#/visitor/${t.visitorId}`}>{v ? `${pad3(v.no)} ${v.surname}さん` : ''}</a>
+                  <a className="grow name" href={`#/visitor/${t.visitorId}`}>{noLabel(v)}</a>
                   {op && <button className="btn" onClick={() => act('resume_ticket', { p_ticket_id: t.id }, '離席から戻る')}>戻った(元の順番へ)</button>}
                 </li>
               );
@@ -122,7 +122,7 @@ export function DeskScreen({ id }: { id: number }) {
       )}
       {guide !== null && !next && s.waiting.length > 0 && !busy && (
         <Sheet title="続けて、次の方をご案内" onClose={() => setGuide(null)}>
-          {visitor(guide) && <p className="hint">{pad3(visitor(guide)!.no)} {visitor(guide)!.surname}さん{sentTo ? ` → ${sentTo}` : ''}(記録しました)</p>}
+          {visitor(guide) && <p className="hint">{noLabel(visitor(guide))}{sentTo ? ` → ${sentTo}` : ''}(記録しました)</p>}
           <GuideCard s={s} />
           <div className="actions"><button className="btn ghost" onClick={() => setGuide(null)}>あとで</button></div>
         </Sheet>

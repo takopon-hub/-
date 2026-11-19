@@ -3,8 +3,8 @@
 -- 設計方針
 --  * テーブルは API に公開されない app スキーマに置く。public には公開用の関数(RPC)だけを置く。
 --  * すべての関数は先頭引数にパスコードを取り、関数内で権限(operator / viewer)を判定する。
---  * 取得する個人情報は「苗字」だけ。電話番号は取得しない。
---  * 閲覧者(viewer)にはメモを返さない。更新系はすべて operator のみ。
+--  * 個人情報は一切取らない。相談者は受付番号だけで管理する(氏名・電話番号・メモの列はない)。
+--  * 更新系はすべて operator のみ。
 --  * 通信断で同じ操作が再送されても壊れないよう、作成系はクライアントが採番した uuid を受け取り、
 --    状態遷移系は「すでにその状態なら成功扱い」にする。
 --  * Supabase の API 経由では「WHERE のない UPDATE / DELETE」が拒否されるため、全件対象でも where を書く。
@@ -57,12 +57,14 @@ create table if not exists app.desk (
 create table if not exists app.visitor (
   id         uuid primary key,
   no         int  not null unique,
-  surname    text not null check (length(surname) between 1 and 20),
-  memo       text not null default '' check (length(memo) <= 60),
   wishes     int[] not null default '{}',   -- 相談を希望する相談先(最初に並ぶ先を含む)
   status     text not null default 'in' check (status in ('in', 'left')),
   created_at timestamptz not null default now()
 );
+
+-- 旧版(苗字・メモあり)からの切り替え: 個人情報の列を消す(受付番号・相談履歴は残る)
+alter table app.visitor drop column if exists surname;
+alter table app.visitor drop column if exists memo;
 
 -- queued_at = 実際に並んだ時刻(履歴表示用) / queue_at = 行列内の順序(離席による入れ替えで変わる)
 create table if not exists app.ticket (
@@ -93,7 +95,7 @@ create table if not exists app.op_log (
   id     bigserial primary key,
   at     timestamptz not null default now(),
   action text not null,
-  detail text not null default ''   -- 受付番号など。氏名は入れない
+  detail text not null default ''   -- 受付番号など。個人情報は入れない
 );
 
 alter table app.config  enable row level security;
@@ -165,7 +167,7 @@ end $$;
 
 -- ---------------------------------------------------------------- 公開 RPC: 読み取り
 
--- 画面に必要な全データ。閲覧者にはメモを含めない。
+-- 画面に必要な全データ(個人情報は含まない)。
 create or replace function public.snapshot(p_pass text) returns jsonb
 language plpgsql security definer set search_path = app, public as $$
 declare r text := app.role_of(p_pass); op boolean;
@@ -181,10 +183,9 @@ begin
       ) order by d.sort, d.id) from app.desk d), '[]'::jsonb),
     'visitors', coalesce((
       select jsonb_agg(jsonb_build_object(
-        'id', v.id, 'no', v.no, 'surname', v.surname, 'status', v.status,
+        'id', v.id, 'no', v.no, 'status', v.status,
         'wishes', to_jsonb(v.wishes), 'createdAt', v.created_at
-      ) || case when op then jsonb_build_object('memo', v.memo) else '{}'::jsonb end
-      order by v.no) from app.visitor v), '[]'::jsonb),
+      ) order by v.no) from app.visitor v), '[]'::jsonb),
     'tickets', coalesce((
       select jsonb_agg(jsonb_build_object(
         'id', t.id, 'visitorId', t.visitor_id, 'deskId', t.desk_id, 'status', t.status,
@@ -207,25 +208,23 @@ end $$;
 -- 受付。p_desk_id=最初に並ぶ相談先(省略可)、p_wishes=相談を希望する相談先(最初の先を含めて記録する)
 create or replace function public.register_visitor(
   p_pass text, p_visitor_id uuid, p_ticket_id uuid,
-  p_surname text, p_desk_id int, p_wishes int[] default '{}', p_memo text default ''
+  p_desk_id int, p_wishes int[] default '{}'
 ) returns jsonb
 language plpgsql security definer set search_path = app, public as $$
-declare v_no int; v_surname text := btrim(coalesce(p_surname, ''));
+declare v_no int;
 begin
   perform app.require_operator(p_pass);
   select no into v_no from app.visitor where id = p_visitor_id;
   if found then return jsonb_build_object('no', v_no, 'already', true); end if;  -- 再送
 
-  if length(v_surname) not between 1 and 20 then raise exception 'E_INPUT: 苗字を1〜20文字で入力してください'; end if;
-  if length(coalesce(p_memo, '')) > 60 then raise exception 'E_INPUT: メモは60文字以内にしてください'; end if;
   if p_desk_id is not null and not exists (select 1 from app.desk where id = p_desk_id and active) then
     raise exception 'E_DESK_CLOSED: その相談先は休止中です';
   end if;
 
   perform pg_advisory_xact_lock(7001);
   select coalesce(max(no), 0) + 1 into v_no from app.visitor;
-  insert into app.visitor (id, no, surname, memo, wishes)
-    values (p_visitor_id, v_no, v_surname, coalesce(p_memo, ''), app.clean_wishes(p_wishes, p_desk_id));
+  insert into app.visitor (id, no, wishes)
+    values (p_visitor_id, v_no, app.clean_wishes(p_wishes, p_desk_id));
   if p_desk_id is not null then
     insert into app.ticket (id, visitor_id, desk_id) values (p_ticket_id, p_visitor_id, p_desk_id);
   end if;
@@ -234,15 +233,12 @@ begin
 end $$;
 
 create or replace function public.update_visitor(
-  p_pass text, p_visitor_id uuid, p_surname text, p_memo text, p_wishes int[]
+  p_pass text, p_visitor_id uuid, p_wishes int[]
 ) returns jsonb
 language plpgsql security definer set search_path = app, public as $$
-declare v_surname text := btrim(coalesce(p_surname, ''));
 begin
   perform app.require_operator(p_pass);
-  if length(v_surname) not between 1 and 20 then raise exception 'E_INPUT: 苗字を1〜20文字で入力してください'; end if;
-  if length(coalesce(p_memo, '')) > 60 then raise exception 'E_INPUT: メモは60文字以内にしてください'; end if;
-  update app.visitor set surname = v_surname, memo = coalesce(p_memo, ''), wishes = app.clean_wishes(p_wishes)
+  update app.visitor set wishes = app.clean_wishes(p_wishes)
     where id = p_visitor_id;
   if not found then raise exception 'E_NOT_FOUND: 相談者が見つかりません'; end if;
   perform app.log('情報修正', app.visitor_no(p_visitor_id));

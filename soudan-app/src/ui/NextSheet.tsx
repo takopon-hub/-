@@ -1,6 +1,6 @@
 import { useStore } from '../lib/store';
 import { waitLabel } from '../lib/queue';
-import { newId, pad3 } from '../lib/format';
+import { newId, noLabel } from '../lib/format';
 import { Sheet, Badge, CategoryTag } from './common';
 import { useAsk } from './Confirm';
 
@@ -25,7 +25,7 @@ export function NextSheet({ visitorId, onClose, moveTicketId, fromDeskId, onChos
   if (!view) return null;
   const { visitor } = view;
   const moving = Boolean(moveTicketId);
-  const label = `${pad3(visitor.no)} ${visitor.surname}`;
+  const label = noLabel(visitor);
 
   async function choose(deskId: number) {
     const target = deskStates.find((d) => d.desk.id === deskId);
@@ -33,9 +33,9 @@ export function NextSheet({ visitorId, onClose, moveTicketId, fromDeskId, onChos
     const from = fromDeskId !== undefined ? deskStates.find((d) => d.desk.id === fromDeskId)?.desk.name ?? '' : '';
     const ok = await ask(moveTicketId
       ? { title: '付け替えの確認', okLabel: '付け替える',
-          lines: [['相談者', `${label}さん`], ['移動', `${from} → ${name}`], ['順番', `${name} の待ち行列の最後尾(待ち${target?.waiting.length ?? 0}人)`]] }
+          lines: [['相談者', `${label}`], ['移動', `${from} → ${name}`], ['順番', `${name} の待ち行列の最後尾(待ち${target?.waiting.length ?? 0}人)`]] }
       : { title: '次の行き先の確認', okLabel: '待ち行列に並ばせる',
-          lines: [['相談者', `${label}さん`], ['行き先', name], ['順番', `待ち行列の最後尾(いま待ち${target?.waiting.length ?? 0}人 / ${waitLabel(target?.newArrivalWait ?? 0)})`]] });
+          lines: [['相談者', `${label}`], ['行き先', name], ['順番', `待ち行列の最後尾(いま待ち${target?.waiting.length ?? 0}人 / ${waitLabel(target?.newArrivalWait ?? 0)})`]] });
     if (!ok) return;
     onChosen?.(`${name}へ`);
     onClose();
@@ -47,7 +47,7 @@ export function NextSheet({ visitorId, onClose, moveTicketId, fromDeskId, onChos
   }
   async function leave() {
     const ok = await ask({ title: '帰宅の確認', okLabel: '帰宅として登録する',
-      lines: [['相談者', `${label}さん`], ['登録', '帰宅(待ち行列に並んでいれば取り消されます)']] });
+      lines: [['相談者', `${label}`], ['登録', '帰宅(待ち行列に並んでいれば取り消されます)']] });
     if (!ok) return;
     onChosen?.('帰宅');
     onClose();
@@ -75,7 +75,7 @@ export function NextSheet({ visitorId, onClose, moveTicketId, fromDeskId, onChos
   };
 
   return (
-    <Sheet title={moving ? `${label}さん 相談先の付け替え` : `${label}さん 次の行き先`} onClose={onClose}>
+    <Sheet title={moving ? `${label} 相談先の付け替え` : `${label} 次の行き先`} onClose={onClose}>
       <p className="hint">
         {moving
           ? '選んだ相談先の待ち行列の最後尾に移します。'

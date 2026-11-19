@@ -36,9 +36,10 @@ before(async () => {
 after(async () => { if (db) await db.end(); });
 
 const deskId = async (name) => (await db.query('select id from app.desk where name = $1', [name])).rows[0].id;
-async function reg(surname = '山田', desk = 1, wishes = []) {
+// 第1引数はテストの読みやすさのための呼び名(DBには送らない。個人情報は取らない)
+async function reg(_label = 'x', desk = 1, wishes = []) {
   const v = uuid(), t = uuid();
-  const r = await rpc('register_visitor', [OP, v, t, surname, desk, wishes, '']);
+  const r = await rpc('register_visitor', [OP, v, t, desk, wishes]);
   return { v, t, no: r.no };
 }
 const snap = (pass = OP) => rpc('snapshot', [pass]);
@@ -62,27 +63,26 @@ test('相談先は区分つきで、公的→民間→金融の順。弁護士�
 test('パスコード: 不一致は拒否、閲覧者は更新できない', { skip }, async () => {
   await fails(rpc('snapshot', ['wrong']), 'E_AUTH');
   await fails(rpc('snapshot', ['']), 'E_AUTH');
-  await fails(rpc('register_visitor', [VW, uuid(), uuid(), '山田', 1, [], '']), 'E_FORBIDDEN');
+  await fails(rpc('register_visitor', [VW, uuid(), uuid(), 1, []]), 'E_FORBIDDEN');
   await fails(rpc('purge_all', [VW, '全データを削除', false]), 'E_FORBIDDEN');
   await fails(rpc('get_log', [VW]), 'E_FORBIDDEN');
 });
 
-test('個人情報は苗字だけ。電話番号の列は存在せず、閲覧者にはメモも返らない', { skip }, async () => {
+test('個人情報は一切持たない。氏名・電話番号・メモの列は存在せず、スナップショットにも出ない', { skip }, async () => {
   const cols = (await db.query(`select column_name from information_schema.columns where table_schema = 'app' and table_name = 'visitor'`)).rows.map((r) => r.column_name);
-  assert.ok(!cols.includes('phone'));
-  const a = await reg('佐藤', 1);
-  await rpc('update_visitor', [OP, a.v, '佐藤', '要配慮', [1]]);
-  const o = (await snap(OP)).visitors.find((x) => x.id === a.v);
-  const w = (await snap(VW)).visitors.find((x) => x.id === a.v);
-  assert.equal(o.memo, '要配慮');
-  assert.ok(!('memo' in w));
-  assert.ok(!JSON.stringify(await snap(VW)).includes('要配慮'));
+  assert.deepEqual(cols.sort(), ['created_at', 'id', 'no', 'status', 'wishes']);
+  const a = await reg('x', 1);
+  await rpc('update_visitor', [OP, a.v, [1, 2]]);
+  for (const pass of [OP, VW]) {
+    const v = (await snap(pass)).visitors.find((x) => x.id === a.v);
+    assert.deepEqual(Object.keys(v).sort(), ['createdAt', 'id', 'no', 'status', 'wishes']);
+  }
 });
 
 test('受付: 番号は連番、再送しても同じ番号で二重登録されない', { skip }, async () => {
   const v = uuid(), t = uuid();
-  const r1 = await rpc('register_visitor', [OP, v, t, '鈴木', 2, [], '']);
-  const r2 = await rpc('register_visitor', [OP, v, t, '鈴木', 2, [], '']);
+  const r1 = await rpc('register_visitor', [OP, v, t, 2, []]);
+  const r2 = await rpc('register_visitor', [OP, v, t, 2, []]);
   assert.equal(r1.no, r2.no);
   assert.equal(r2.already, true);
   assert.equal((await reg('高橋')).no, r1.no + 1);
@@ -92,19 +92,15 @@ test('受付: 希望先を複数記録でき、最初に並ぶ先も希望先に
   const a = await reg('希望', 3, [5, 7]);
   const v = (await snap()).visitors.find((x) => x.id === a.v);
   assert.deepEqual(v.wishes, [3, 5, 7]);
-  await fails(rpc('register_visitor', [OP, uuid(), uuid(), '不正', 1, [999], '']), 'E_INPUT');
+  await fails(rpc('register_visitor', [OP, uuid(), uuid(), 1, [999]]), 'E_INPUT');
   // 希望なしで受付だけ(最初の相談先を決めない)もできる
-  const r = await rpc('register_visitor', [OP, uuid(), uuid(), '先未定', null, [], '']);
+  const r = await rpc('register_visitor', [OP, uuid(), uuid(), null, []]);
   assert.ok(r.no > 0);
 });
 
-test('入力チェック: 苗字・メモ・休止中の相談先', { skip }, async () => {
-  const args = (s, d, m = '') => [OP, uuid(), uuid(), s, d, [], m];
-  await fails(rpc('register_visitor', args('', 1)), 'E_INPUT');
-  await fails(rpc('register_visitor', args('山'.repeat(21), 1)), 'E_INPUT');
-  await fails(rpc('register_visitor', args('山田', 1, 'あ'.repeat(61))), 'E_INPUT');
+test('入力チェック: 休止中の相談先には受付できない', { skip }, async () => {
   await db.query('update app.desk set active = false where id = 3');
-  await fails(rpc('register_visitor', args('山田', 3)), 'E_DESK_CLOSED');
+  await fails(rpc('register_visitor', [OP, uuid(), uuid(), 3, []]), 'E_DESK_CLOSED');
   await db.query('update app.desk set active = true where id = 3');
 });
 
@@ -221,11 +217,11 @@ test('相談先の追加・変更・区分、パスコード変更', { skip }, a
   assert.equal((await snap()).role, 'operator');
 });
 
-test('操作ログに苗字が入らない', { skip }, async () => {
-  await reg('個人情報テスト', 1);
-  const log = JSON.stringify(await rpc('get_log', [OP]));
-  assert.ok(log.length > 10);
-  assert.ok(!log.includes('個人情報テスト'));
+test('操作ログは受付番号だけで、個人情報の列を持たない', { skip }, async () => {
+  await reg('x', 1);
+  const log = await rpc('get_log', [OP]);
+  assert.ok(log.length > 0);
+  assert.ok(log.some((l) => /^\d{3}/.test(l.detail)));
 });
 
 test('離席: 待ち行列から外れ、次の人が先に案内され、戻ると離席前の順番(残りの先頭)に戻る。二重実行・二重並びは拒否', { skip }, async () => {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStore, storage } from '../lib/store';
 import { readyDesks, waitLabel, waitLevel, type DeskState } from '../lib/queue';
-import { CATEGORY_LABEL, hhmm, minutesBetween, pad3 } from '../lib/format';
+import { CATEGORY_LABEL, hhmm, minutesBetween, noLabel } from '../lib/format';
 import { GuideCard } from './Guide';
 import { Badge, CATEGORIES, CategoryTag, Elapsed, go } from './common';
 
@@ -107,7 +107,7 @@ function DeskCard({ s, nowMs, mine, onStar }: { s: DeskState; nowMs: number; min
             const v = vname(t.visitorId);
             return (
               <li key={t.id}>
-                <Badge kind="serve">相談中</Badge> <span className="who">{v ? `${pad3(v.no)} ${v.surname}` : ''}</span>
+                <Badge kind="serve">相談中</Badge> <span className="who">{noLabel(v)}</span>
                 <Elapsed startedAt={t.startedAt} nowMs={nowMs} />
               </li>
             );
@@ -117,7 +117,7 @@ function DeskCard({ s, nowMs, mine, onStar }: { s: DeskState; nowMs: number; min
           <ol className="chips">
             {s.waiting.slice(0, 6).map((w) => {
               const v = vname(w.ticket.visitorId);
-              return <li key={w.ticket.id}>{v ? `${pad3(v.no)} ${v.surname}` : ''}</li>;
+              return <li key={w.ticket.id}>{noLabel(v)}</li>;
             })}
             {n > 6 && <li className="more">ほか{n - 6}人</li>}
           </ol>
@@ -130,7 +130,7 @@ function DeskCard({ s, nowMs, mine, onStar }: { s: DeskState; nowMs: number; min
             {s.done.map((t) => {
               const v = vname(t.visitorId);
               const m = minutesBetween(t.startedAt, t.endedAt);
-              return <li key={t.id}>{v ? `${pad3(v.no)} ${v.surname}` : ''}{m !== null && <small> {m}分({hhmm(t.endedAt)}終了)</small>}</li>;
+              return <li key={t.id}>{noLabel(v)}{m !== null && <small> {m}分({hhmm(t.endedAt)}終了)</small>}</li>;
             })}
           </ol>
         )}

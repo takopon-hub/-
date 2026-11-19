@@ -116,7 +116,7 @@ describe('roundWait', () => {
 
 describe('visitorViews', () => {
   const v = (id: string, status: 'in' | 'left' = 'in'): Visitor => ({
-    id, no: 1, surname: 'x', status, wishes: [1, 2, 3], createdAt: at(0),
+    id, no: 1, status, wishes: [1, 2, 3], createdAt: at(0),
   });
   it('履歴・現在地・相談済み・未決定を判定する', () => {
     const t1 = tk({ deskId: 1, status: 'done', visitorId: 'a', queuedAt: at(0) });
@@ -157,7 +157,7 @@ describe('離席(away)', () => {
     expect(s.away).toHaveLength(1);
   });
   it('離席中の人は「行き先未決定」にならず、現在の待ち札は離席中', () => {
-    const v: Visitor = { id: 'v1', no: 1, surname: '山田', status: 'in', wishes: [], createdAt: at(0) } as Visitor;
+    const v: Visitor = { id: 'v1', no: 1, status: 'in', wishes: [], createdAt: at(0) } as Visitor;
     const [view] = visitorViews([v], [tk({ deskId: 1, status: 'away', visitorId: 'v1' })]);
     expect(view.idle).toBe(false);
     expect(view.current?.status).toBe('away');
